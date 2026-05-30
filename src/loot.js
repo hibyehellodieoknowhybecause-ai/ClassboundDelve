@@ -62,6 +62,25 @@ export function createBlueprintDrop(blueprintId, name, player, x, y, description
   };
 }
 
+export function createMaterialDrop(material, amount, player, x, y) {
+  const isCore = material === "weaponCore";
+  const name = isCore ? "Tempered Core" : "Weapon Ore";
+  return {
+    id: `material-${material}-${player.playerIndex}-${Math.random().toString(16).slice(2)}`,
+    type: "material",
+    material,
+    amount,
+    name,
+    playerIndex: player.playerIndex,
+    playerLabel: player.label,
+    x,
+    y,
+    radius: isCore ? 24 : 21,
+    color: isCore ? "#f2b85b" : "#73a9ff",
+    bob: Math.random() * Math.PI * 2
+  };
+}
+
 export function createShop(x, y) {
   return {
     id: `shop-${Math.random().toString(16).slice(2)}`,
@@ -71,6 +90,7 @@ export function createShop(x, y) {
     y,
     radius: 38,
     color: "#f2b85b",
+    stock: null,
     bob: Math.random() * Math.PI * 2
   };
 }
@@ -194,7 +214,7 @@ export function nearestInteractable(loot, player) {
   let best = null;
   let bestDistance = Infinity;
   for (const item of loot) {
-    if (item.type === "blueprint" && item.playerIndex !== player.playerIndex) {
+    if ((item.type === "blueprint" || item.type === "material") && item.playerIndex !== player.playerIndex) {
       continue;
     }
     const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;

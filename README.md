@@ -45,15 +45,15 @@ http://localhost:4173
     - Boss 4 unlocks Moon Shades.
     - Boss 5 unlocks Vault Bulwarks.
   - A Classbound Shop also appears on the second and fourth floor of each boss cycle: stages 2, 4, 7, 9, and so on.
-  - Shops carry 1-3 paid items and only sell health pots, hidden questline hooks, and ascension materials.
+  - Shops carry 1-3 paid items, stay in the room after browsing, and only remove an offer when it is bought.
   - Shop health pots cost 30 coins and heal 25% max HP.
   - The first boss drops one weapon upgrade blueprint pickup per player.
   - Weapon blueprints have class-specific completion requirements:
     - Swordsman Saber Temper: 6 Weapon Ore, 1 Tempered Core, and 450 coins.
     - Archer Moonstring: 4 Weapon Ore, 2 Tempered Cores, and 520 coins.
-  - Later bosses award weapon blueprint progress materials to players who have claimed an unfinished weapon blueprint.
+  - Later bosses drop weapon blueprint progress material pickups for players who have claimed an unfinished weapon blueprint.
   - The second boss drops the hero ascension blueprint.
-  - Weapon and hero materials can appear in shops and 1% enemy drops only after their blueprint has been discovered.
+  - Weapon materials can appear in shops and as 1% enemy pickup drops only after their blueprint has been discovered.
   - Chests have rarity colors: common, uncommon, rare, and legendary.
   - Higher rarity chests have better odds for rare/legendary rewards.
   - Bosses drop higher rarity chests.

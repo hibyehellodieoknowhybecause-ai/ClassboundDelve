@@ -621,6 +621,43 @@ export class Renderer {
         continue;
       }
 
+      if (item.type === "material") {
+        ctx.save();
+        ctx.translate(item.x, item.y + bob);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+        ctx.beginPath();
+        this.drawEllipse(ctx, 0, 21, 24, 8);
+        ctx.fill();
+
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = "#101317";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (item.material === "weaponCore") {
+          ctx.moveTo(0, -28);
+          ctx.lineTo(22, -7);
+          ctx.lineTo(11, 23);
+          ctx.lineTo(-11, 23);
+          ctx.lineTo(-22, -7);
+        } else {
+          ctx.moveTo(0, -24);
+          ctx.lineTo(18, -5);
+          ctx.lineTo(8, 22);
+          ctx.lineTo(-15, 15);
+          ctx.lineTo(-18, -8);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (item.amount > 1) {
+          ctx.fillStyle = "#101317";
+          ctx.font = "900 12px ui-sans-serif, system-ui";
+          ctx.fillText(`x${item.amount}`, 0, 6);
+        }
+        ctx.restore();
+        continue;
+      }
+
       if (item.type === "shop") {
         ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
         ctx.beginPath();
@@ -1004,9 +1041,11 @@ export class Renderer {
       const statLine = item.type === "chest"
         ? `${item.name}: choose one of three rewards`
         : item.type === "shop"
-          ? `${item.name}: paid stock available`
+          ? item.stock ? `${item.name}: ${item.stock.length} offers remaining` : `${item.name}: paid stock available`
           : item.type === "blueprint"
             ? item.description
+            : item.type === "material"
+              ? `${item.playerLabel ?? "Player"} pickup: ${item.amount > 1 ? `${item.amount} ` : ""}${item.name}`
             : "";
       const boxWidth = Math.min(width - 28, Math.max(width <= 680 ? 280 : 360, Math.max(label.length, statLine.length) * 7.4));
       const x = this.canvas.width / scale / 2 - boxWidth / 2;
@@ -1280,6 +1319,9 @@ export class Renderer {
     }
     if (item.type === "blueprint") {
       return `${prefix}Press interact to claim ${item.name ?? "weapon blueprint"}`;
+    }
+    if (item.type === "material") {
+      return `${prefix}Press interact to pick up ${item.name ?? "material"}`;
     }
     if (item.type === "sage") {
       return `${prefix}Press interact to deliver the message`;

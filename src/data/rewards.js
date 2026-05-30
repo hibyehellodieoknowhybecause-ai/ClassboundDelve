@@ -356,6 +356,9 @@ function filteredPool(player, pool) {
 }
 
 export function canApplyReward(player, reward) {
+  if (reward.requiresBlueprint && !player.blueprints[reward.requiresBlueprint]) {
+    return false;
+  }
   if (reward.grantsExtraAbility) {
     if (player.canMannequinTransform) {
       return false;

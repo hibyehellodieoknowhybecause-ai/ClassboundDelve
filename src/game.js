@@ -5,7 +5,7 @@ import { createHiddenQuestStage, createLobbyStage, createStage } from "./data/st
 import { Player } from "./player.js";
 import { createEnemies, updateEnemies } from "./enemies.js";
 import { CombatSystem } from "./combat.js";
-import { createBlueprintDrop, createHealthPotion, createLobbyCharacter, createLobbyPortal, createLobbySpot, createQuestPortal, createSage, nearestInteractable, spawnRewardLoot } from "./loot.js";
+import { createBlueprintDrop, createHealthPotion, createLobbyCharacter, createLobbyPortal, createLobbySpot, createMaterialDrop, createQuestPortal, createSage, nearestInteractable, spawnRewardLoot } from "./loot.js";
 import { clamp } from "./utils/math.js";
 
 export class Game {
@@ -222,14 +222,13 @@ export class Game {
     for (const player of this.players) {
       player.gold += gold;
       if (player.blueprints.weaponEvolution && Math.random() < 0.01) {
-        player.materials.weapon += 1;
-        this.combat.floatText(player.x, player.y - 68, "+1 Weapon Ore", "#73a9ff");
+        this.spawnPlayerMaterialDrop("weapon", 1, player, enemy, player.playerIndex);
+        this.combat.floatText(enemy.x, enemy.y - enemy.radius - 38, `${player.label} Weapon Ore dropped`, "#73a9ff");
       }
       if (player.blueprints.heroAscension && Math.random() < 0.01) {
         player.materials.hero += 1;
         this.combat.floatText(player.x, player.y - 86, "+1 Hero Sigil", "#f2b85b");
       }
-      this.tryCompleteWeaponUpgrade(player);
     }
     this.combat.floatText(enemy.x, enemy.y - enemy.radius - 18, `+${gold} coin`, "#f2b85b");
   }
@@ -272,12 +271,22 @@ export class Game {
       if (!player.blueprints.weaponEvolution || player.weaponEvolution.completed) {
         continue;
       }
-      player.materials.weaponCore += 1;
-      player.materials.weapon += 2;
-      this.combat.floatText(player.x, player.y - 104, "+1 Tempered Core", "#73a9ff");
-      this.combat.floatText(player.x, player.y - 84, "+2 Weapon Ore", "#73a9ff");
-      this.tryCompleteWeaponUpgrade(player, enemy);
+      this.spawnPlayerMaterialDrop("weaponCore", 1, player, enemy, player.playerIndex * 2);
+      this.spawnPlayerMaterialDrop("weapon", 2, player, enemy, player.playerIndex * 2 + 1);
+      this.combat.floatText(enemy.x, enemy.y - enemy.radius - 62 - player.playerIndex * 20, `${player.label} upgrade materials dropped`, "#73a9ff");
     }
+  }
+
+  spawnPlayerMaterialDrop(material, amount, player, source, slot = 0) {
+    const angle = -Math.PI / 2 + slot * 0.72;
+    const radius = source.radius + 58 + (slot % 2) * 18;
+    this.loot.push(createMaterialDrop(
+      material,
+      amount,
+      player,
+      source.x + Math.cos(angle) * radius,
+      source.y + Math.sin(angle) * radius
+    ));
   }
 
   collectBlueprint(player, target) {
@@ -288,6 +297,20 @@ export class Game {
     this.loot = this.loot.filter((item) => item.id !== target.id);
     this.combat.floatText(player.x, player.y - 82, `${target.name} claimed`, target.color);
     this.combat.floatText(player.x, player.y - 60, weaponUpgradeRequirementLine(player), "#afa89e");
+    this.tryCompleteWeaponUpgrade(player);
+  }
+
+  collectMaterial(player, target) {
+    if (target.material === "weaponCore") {
+      player.materials.weaponCore += target.amount;
+    } else if (target.material === "weapon") {
+      player.materials.weapon += target.amount;
+    } else {
+      return;
+    }
+    this.loot = this.loot.filter((item) => item.id !== target.id);
+    const amountLabel = target.amount > 1 ? `+${target.amount}` : "+1";
+    this.combat.floatText(player.x, player.y - 72, `${amountLabel} ${target.name}`, target.color);
     this.tryCompleteWeaponUpgrade(player);
   }
 
@@ -427,7 +450,8 @@ export class Game {
     }
     const targetPlayer = this.rewardPicker ?? this.player;
     if (!canApplyReward(targetPlayer, reward)) {
-      this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, "Mannequin cannot learn evo skills", "#d95757");
+      const message = this.rewardChest?.type === "shop" ? "Cannot buy that" : "Mannequin cannot learn evo skills";
+      this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, message, "#d95757");
       this.rewardChoices = null;
       this.rewardChest = null;
       this.rewardPicker = null;
@@ -450,10 +474,16 @@ export class Game {
         this.spawnHiddenQuestPortal(targetPlayer);
       }
       this.tryCompleteWeaponUpgrade(targetPlayer);
+      this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
-      this.rewardChoices = null;
-      this.rewardChest = null;
-      this.rewardPicker = null;
+      if (this.rewardChest.stock.length === 0) {
+        this.combat.floatText(targetPlayer.x, targetPlayer.y - 84, "Shop sold out", "#afa89e");
+        this.rewardChoices = null;
+        this.rewardChest = null;
+        this.rewardPicker = null;
+        return;
+      }
+      this.rewardChoices = this.rewardChest.stock;
       return;
     }
     if (!applyReward(targetPlayer, reward)) {
@@ -485,12 +515,26 @@ export class Game {
         continue;
       }
 
-      if (target.type === "chest" || target.type === "shop") {
+      if (target.type === "chest") {
         target.opened = true;
         this.rewardChest = target;
         this.rewardPicker = player;
-        this.rewardChoices = target.type === "shop" ? rollShopOptions(player, 3) : rollRewardOptions(player, 3, target.rarity);
+        this.rewardChoices = rollRewardOptions(player, 3, target.rarity);
         this.loot = this.loot.filter((item) => item.id !== target.id);
+        return;
+      }
+
+      if (target.type === "shop") {
+        if (!target.stock) {
+          target.stock = rollShopOptions(player, 3);
+        }
+        if (target.stock.length === 0) {
+          this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
+          return;
+        }
+        this.rewardChest = target;
+        this.rewardPicker = player;
+        this.rewardChoices = target.stock;
         return;
       }
 
@@ -519,6 +563,11 @@ export class Game {
 
       if (target.type === "blueprint") {
         this.collectBlueprint(player, target);
+        return;
+      }
+
+      if (target.type === "material") {
+        this.collectMaterial(player, target);
         return;
       }
 
