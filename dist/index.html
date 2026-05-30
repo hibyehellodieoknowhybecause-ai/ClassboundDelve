@@ -1032,7 +1032,7 @@ function weaponStats(weapon, player = null) {
     stats.push(`Base DMG ${player.baseDamage}`);
   }
 
-  const damageBonus = (weapon.damageBonus ?? 0) + (player?.weaponEvolution?.damageBonus ?? 0) + (player?.statBonuses?.weaponDamage ?? 0);
+  const damageBonus = (weapon.damageBonus ?? 0) + (player?.weaponEvolution?.damageBonus ?? 0) + (player?.statBonuses?.attackDamage ?? 0);
   if (damageBonus > 0) {
     stats.push(`DMG +${Math.round(damageBonus * 100)}%`);
   }
@@ -1140,13 +1140,13 @@ const rewardPool = [
     }
   },
   {
-    id: "weaponDamage",
+    id: "attackDamage",
     type: "Stat",
     name: "Sharpened Focus",
     rarity: "common",
-    description: "+16% weapon damage.",
+    description: "+16% attack damage.",
     apply(player) {
-      player.statBonuses.weaponDamage += 0.16;
+      player.statBonuses.attackDamage += 0.16;
     }
   },
   {
@@ -1233,7 +1233,7 @@ const rewardPool = [
     rarity: "legendary",
     description: "+20% damage, +12% speed, and ultimate cooldown is 20% faster.",
     apply(player) {
-      player.statBonuses.weaponDamage += 0.2;
+      player.statBonuses.attackDamage += 0.2;
       player.statBonuses.moveSpeed += 0.12;
       player.statBonuses.abilityCooldown += 0.2;
     }
@@ -3406,7 +3406,7 @@ class Player {
     this.animationTime = 0;
     this.slowed = 0;
     this.statBonuses = {
-      weaponDamage: 0,
+      attackDamage: 0,
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
@@ -3485,7 +3485,7 @@ class Player {
     return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.65, this.statBonuses.attackSpeed));
   }
 
-  weaponDamageBonus() {
+  attackDamageBonus() {
     if (this.secretWeapon) {
       return 0;
     }
@@ -3496,7 +3496,7 @@ class Player {
     if (this.weapon?.kind === "nuke") {
       return this.weapon.damage ?? 9999;
     }
-    return this.baseDamage * (1 + this.statBonuses.weaponDamage + this.weaponDamageBonus());
+    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus());
   }
 
   update(dt, input, camera, room, combat) {
@@ -3897,7 +3897,7 @@ class Player {
         angle: (Math.PI * 2 * i) / 8,
         speed: 620,
         radius: 8,
-        damage: 22 * (1 + this.statBonuses.weaponDamage),
+        damage: 22 * (1 + this.statBonuses.attackDamage),
         life: 0.62,
         color: this.character.accent
       });
@@ -3935,7 +3935,7 @@ class Player {
         angle: angleTo(pet, target),
         speed: 680,
         radius: 6,
-        damage: 12 * (1 + this.statBonuses.weaponDamage),
+        damage: 12 * (1 + this.statBonuses.attackDamage),
         life: 0.75,
         color: pet.color
       });
@@ -4004,7 +4004,7 @@ class Player {
     this.inventoryMessage = `${character.name} selected`;
     this.slowed = 0;
     this.statBonuses = {
-      weaponDamage: 0,
+      attackDamage: 0,
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
@@ -6204,7 +6204,7 @@ class Game {
       return false;
     }
     this.combat.floatText(source.x, source.y - 124, `${blueprint.name} complete`, "#f2b85b");
-    this.combat.floatText(player.x, player.y - 104, `Class weapon +${Math.round(blueprint.damageBonus * 100)}% damage`, "#73a9ff");
+    this.combat.floatText(player.x, player.y - 104, `Attack damage +${Math.round(blueprint.damageBonus * 100)}%`, "#73a9ff");
     return true;
   }
 

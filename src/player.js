@@ -80,7 +80,7 @@ export class Player {
     this.animationTime = 0;
     this.slowed = 0;
     this.statBonuses = {
-      weaponDamage: 0,
+      attackDamage: 0,
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
@@ -159,7 +159,7 @@ export class Player {
     return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.65, this.statBonuses.attackSpeed));
   }
 
-  weaponDamageBonus() {
+  attackDamageBonus() {
     if (this.secretWeapon) {
       return 0;
     }
@@ -170,7 +170,7 @@ export class Player {
     if (this.weapon?.kind === "nuke") {
       return this.weapon.damage ?? 9999;
     }
-    return this.baseDamage * (1 + this.statBonuses.weaponDamage + this.weaponDamageBonus());
+    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus());
   }
 
   update(dt, input, camera, room, combat) {
@@ -571,7 +571,7 @@ export class Player {
         angle: (Math.PI * 2 * i) / 8,
         speed: 620,
         radius: 8,
-        damage: 22 * (1 + this.statBonuses.weaponDamage),
+        damage: 22 * (1 + this.statBonuses.attackDamage),
         life: 0.62,
         color: this.character.accent
       });
@@ -609,7 +609,7 @@ export class Player {
         angle: angleTo(pet, target),
         speed: 680,
         radius: 6,
-        damage: 12 * (1 + this.statBonuses.weaponDamage),
+        damage: 12 * (1 + this.statBonuses.attackDamage),
         life: 0.75,
         color: pet.color
       });
@@ -678,7 +678,7 @@ export class Player {
     this.inventoryMessage = `${character.name} selected`;
     this.slowed = 0;
     this.statBonuses = {
-      weaponDamage: 0,
+      attackDamage: 0,
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,

@@ -80,13 +80,13 @@ const rewardPool = [
     }
   },
   {
-    id: "weaponDamage",
+    id: "attackDamage",
     type: "Stat",
     name: "Sharpened Focus",
     rarity: "common",
-    description: "+16% weapon damage.",
+    description: "+16% attack damage.",
     apply(player) {
-      player.statBonuses.weaponDamage += 0.16;
+      player.statBonuses.attackDamage += 0.16;
     }
   },
   {
@@ -173,7 +173,7 @@ const rewardPool = [
     rarity: "legendary",
     description: "+20% damage, +12% speed, and ultimate cooldown is 20% faster.",
     apply(player) {
-      player.statBonuses.weaponDamage += 0.2;
+      player.statBonuses.attackDamage += 0.2;
       player.statBonuses.moveSpeed += 0.12;
       player.statBonuses.abilityCooldown += 0.2;
     }

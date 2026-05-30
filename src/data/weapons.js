@@ -194,7 +194,7 @@ export function weaponStats(weapon, player = null) {
     stats.push(`Base DMG ${player.baseDamage}`);
   }
 
-  const damageBonus = (weapon.damageBonus ?? 0) + (player?.weaponEvolution?.damageBonus ?? 0) + (player?.statBonuses?.weaponDamage ?? 0);
+  const damageBonus = (weapon.damageBonus ?? 0) + (player?.weaponEvolution?.damageBonus ?? 0) + (player?.statBonuses?.attackDamage ?? 0);
   if (damageBonus > 0) {
     stats.push(`DMG +${Math.round(damageBonus * 100)}%`);
   }

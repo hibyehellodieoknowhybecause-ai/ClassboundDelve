@@ -320,7 +320,7 @@ export class Game {
       return false;
     }
     this.combat.floatText(source.x, source.y - 124, `${blueprint.name} complete`, "#f2b85b");
-    this.combat.floatText(player.x, player.y - 104, `Class weapon +${Math.round(blueprint.damageBonus * 100)}% damage`, "#73a9ff");
+    this.combat.floatText(player.x, player.y - 104, `Attack damage +${Math.round(blueprint.damageBonus * 100)}%`, "#73a9ff");
     return true;
   }
 

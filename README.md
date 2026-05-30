@@ -30,7 +30,7 @@ http://localhost:4173
   - Swordsman uses Iron Saber.
   - Archer uses Elm Longbow.
   - The hidden Mysterious Nuke secret still overrides the class weapon when unlocked.
-- Base weapon damage now lives on the character instead of the basic weapon.
+- Base attack damage now lives on the character instead of the basic weapon.
 - Basic class weapons provide attack shape only and no damage bonus.
 - Boss blueprint drops now provide the framework for future weapon and hero ascension systems.
 - RPG roguelite layer:
