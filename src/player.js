@@ -189,8 +189,8 @@ export class Player {
     this.slowed = Math.max(0, this.slowed - dt);
 
     const worldMouse = {
-      x: input.mouse.x + camera.x,
-      y: input.mouse.y + camera.y
+      x: input.mouse.x / (camera.scale ?? 1) + camera.x,
+      y: input.mouse.y / (camera.scale ?? 1) + camera.y
     };
     this.facing = angleTo(this, worldMouse);
 

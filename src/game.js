@@ -703,9 +703,13 @@ export class Game {
 
   updateCamera() {
     const canvas = this.renderer.canvas;
+    const scale = this.renderer.worldScale || 1;
+    const viewWidth = canvas.width / scale;
+    const viewHeight = canvas.height / scale;
     const center = this.groupCenter();
-    this.camera.x = clamp(center.x - canvas.width / 2, 0, this.stage.room.width - canvas.width);
-    this.camera.y = clamp(center.y - canvas.height / 2, 0, this.stage.room.height - canvas.height);
+    this.camera.scale = scale;
+    this.camera.x = clamp(center.x - viewWidth / 2, 0, Math.max(0, this.stage.room.width - viewWidth));
+    this.camera.y = clamp(center.y - viewHeight / 2, 0, Math.max(0, this.stage.room.height - viewHeight));
   }
 
   alivePlayers() {

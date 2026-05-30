@@ -7,6 +7,7 @@ export class Renderer {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d");
     this.dpr = 1;
+    this.worldScale = 1;
     this.sprites = loadSpriteImages(spriteSheets);
     this.resize();
     window.addEventListener("resize", () => this.resize());
@@ -18,6 +19,14 @@ export class Renderer {
     const height = Math.floor(window.innerHeight);
     this.canvas.width = width;
     this.canvas.height = height;
+    this.worldScale = this.calculateWorldScale(width, height);
+  }
+
+  calculateWorldScale(width, height) {
+    if (width >= 980 && height >= 620) {
+      return 1;
+    }
+    return Math.max(0.38, Math.min(1, width / 1180, height / 680));
   }
 
   render(game) {
@@ -30,7 +39,9 @@ export class Renderer {
 
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
     ctx.save();
-    ctx.translate(-camera.x + sx, -camera.y + sy);
+    ctx.translate(sx, sy);
+    ctx.scale(this.worldScale, this.worldScale);
+    ctx.translate(-camera.x, -camera.y);
     this.drawRoom(ctx, game.stage);
     this.drawQuestTorches(ctx, game.stage);
     this.drawLoot(ctx, game.loot);
