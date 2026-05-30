@@ -1416,6 +1416,9 @@ function filteredPool(player, pool) {
 }
 
 function canApplyReward(player, reward) {
+  if (reward.requiresBlueprint && !player.blueprints[reward.requiresBlueprint]) {
+    return false;
+  }
   if (reward.grantsExtraAbility) {
     if (player.canMannequinTransform) {
       return false;
@@ -3157,6 +3160,25 @@ function createBlueprintDrop(blueprintId, name, player, x, y, description = "") 
   };
 }
 
+function createMaterialDrop(material, amount, player, x, y) {
+  const isCore = material === "weaponCore";
+  const name = isCore ? "Tempered Core" : "Weapon Ore";
+  return {
+    id: `material-${material}-${player.playerIndex}-${Math.random().toString(16).slice(2)}`,
+    type: "material",
+    material,
+    amount,
+    name,
+    playerIndex: player.playerIndex,
+    playerLabel: player.label,
+    x,
+    y,
+    radius: isCore ? 24 : 21,
+    color: isCore ? "#f2b85b" : "#73a9ff",
+    bob: Math.random() * Math.PI * 2
+  };
+}
+
 function createShop(x, y) {
   return {
     id: `shop-${Math.random().toString(16).slice(2)}`,
@@ -3166,6 +3188,7 @@ function createShop(x, y) {
     y,
     radius: 38,
     color: "#f2b85b",
+    stock: null,
     bob: Math.random() * Math.PI * 2
   };
 }
@@ -3289,7 +3312,7 @@ function nearestInteractable(loot, player) {
   let best = null;
   let bestDistance = Infinity;
   for (const item of loot) {
-    if (item.type === "blueprint" && item.playerIndex !== player.playerIndex) {
+    if ((item.type === "blueprint" || item.type === "material") && item.playerIndex !== player.playerIndex) {
       continue;
     }
     const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;
@@ -4633,6 +4656,43 @@ class Renderer {
         continue;
       }
 
+      if (item.type === "material") {
+        ctx.save();
+        ctx.translate(item.x, item.y + bob);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+        ctx.beginPath();
+        this.drawEllipse(ctx, 0, 21, 24, 8);
+        ctx.fill();
+
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = "#101317";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        if (item.material === "weaponCore") {
+          ctx.moveTo(0, -28);
+          ctx.lineTo(22, -7);
+          ctx.lineTo(11, 23);
+          ctx.lineTo(-11, 23);
+          ctx.lineTo(-22, -7);
+        } else {
+          ctx.moveTo(0, -24);
+          ctx.lineTo(18, -5);
+          ctx.lineTo(8, 22);
+          ctx.lineTo(-15, 15);
+          ctx.lineTo(-18, -8);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        if (item.amount > 1) {
+          ctx.fillStyle = "#101317";
+          ctx.font = "900 12px ui-sans-serif, system-ui";
+          ctx.fillText(`x${item.amount}`, 0, 6);
+        }
+        ctx.restore();
+        continue;
+      }
+
       if (item.type === "shop") {
         ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
         ctx.beginPath();
@@ -5016,9 +5076,11 @@ class Renderer {
       const statLine = item.type === "chest"
         ? `${item.name}: choose one of three rewards`
         : item.type === "shop"
-          ? `${item.name}: paid stock available`
+          ? item.stock ? `${item.name}: ${item.stock.length} offers remaining` : `${item.name}: paid stock available`
           : item.type === "blueprint"
             ? item.description
+            : item.type === "material"
+              ? `${item.playerLabel ?? "Player"} pickup: ${item.amount > 1 ? `${item.amount} ` : ""}${item.name}`
             : "";
       const boxWidth = Math.min(width - 28, Math.max(width <= 680 ? 280 : 360, Math.max(label.length, statLine.length) * 7.4));
       const x = this.canvas.width / scale / 2 - boxWidth / 2;
@@ -5292,6 +5354,9 @@ class Renderer {
     }
     if (item.type === "blueprint") {
       return `${prefix}Press interact to claim ${item.name ?? "weapon blueprint"}`;
+    }
+    if (item.type === "material") {
+      return `${prefix}Press interact to pick up ${item.name ?? "material"}`;
     }
     if (item.type === "sage") {
       return `${prefix}Press interact to deliver the message`;
@@ -5946,14 +6011,13 @@ class Game {
     for (const player of this.players) {
       player.gold += gold;
       if (player.blueprints.weaponEvolution && Math.random() < 0.01) {
-        player.materials.weapon += 1;
-        this.combat.floatText(player.x, player.y - 68, "+1 Weapon Ore", "#73a9ff");
+        this.spawnPlayerMaterialDrop("weapon", 1, player, enemy, player.playerIndex);
+        this.combat.floatText(enemy.x, enemy.y - enemy.radius - 38, `${player.label} Weapon Ore dropped`, "#73a9ff");
       }
       if (player.blueprints.heroAscension && Math.random() < 0.01) {
         player.materials.hero += 1;
         this.combat.floatText(player.x, player.y - 86, "+1 Hero Sigil", "#f2b85b");
       }
-      this.tryCompleteWeaponUpgrade(player);
     }
     this.combat.floatText(enemy.x, enemy.y - enemy.radius - 18, `+${gold} coin`, "#f2b85b");
   }
@@ -5996,12 +6060,22 @@ class Game {
       if (!player.blueprints.weaponEvolution || player.weaponEvolution.completed) {
         continue;
       }
-      player.materials.weaponCore += 1;
-      player.materials.weapon += 2;
-      this.combat.floatText(player.x, player.y - 104, "+1 Tempered Core", "#73a9ff");
-      this.combat.floatText(player.x, player.y - 84, "+2 Weapon Ore", "#73a9ff");
-      this.tryCompleteWeaponUpgrade(player, enemy);
+      this.spawnPlayerMaterialDrop("weaponCore", 1, player, enemy, player.playerIndex * 2);
+      this.spawnPlayerMaterialDrop("weapon", 2, player, enemy, player.playerIndex * 2 + 1);
+      this.combat.floatText(enemy.x, enemy.y - enemy.radius - 62 - player.playerIndex * 20, `${player.label} upgrade materials dropped`, "#73a9ff");
     }
+  }
+
+  spawnPlayerMaterialDrop(material, amount, player, source, slot = 0) {
+    const angle = -Math.PI / 2 + slot * 0.72;
+    const radius = source.radius + 58 + (slot % 2) * 18;
+    this.loot.push(createMaterialDrop(
+      material,
+      amount,
+      player,
+      source.x + Math.cos(angle) * radius,
+      source.y + Math.sin(angle) * radius
+    ));
   }
 
   collectBlueprint(player, target) {
@@ -6012,6 +6086,20 @@ class Game {
     this.loot = this.loot.filter((item) => item.id !== target.id);
     this.combat.floatText(player.x, player.y - 82, `${target.name} claimed`, target.color);
     this.combat.floatText(player.x, player.y - 60, weaponUpgradeRequirementLine(player), "#afa89e");
+    this.tryCompleteWeaponUpgrade(player);
+  }
+
+  collectMaterial(player, target) {
+    if (target.material === "weaponCore") {
+      player.materials.weaponCore += target.amount;
+    } else if (target.material === "weapon") {
+      player.materials.weapon += target.amount;
+    } else {
+      return;
+    }
+    this.loot = this.loot.filter((item) => item.id !== target.id);
+    const amountLabel = target.amount > 1 ? `+${target.amount}` : "+1";
+    this.combat.floatText(player.x, player.y - 72, `${amountLabel} ${target.name}`, target.color);
     this.tryCompleteWeaponUpgrade(player);
   }
 
@@ -6151,7 +6239,8 @@ class Game {
     }
     const targetPlayer = this.rewardPicker ?? this.player;
     if (!canApplyReward(targetPlayer, reward)) {
-      this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, "Mannequin cannot learn evo skills", "#d95757");
+      const message = this.rewardChest?.type === "shop" ? "Cannot buy that" : "Mannequin cannot learn evo skills";
+      this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, message, "#d95757");
       this.rewardChoices = null;
       this.rewardChest = null;
       this.rewardPicker = null;
@@ -6174,10 +6263,16 @@ class Game {
         this.spawnHiddenQuestPortal(targetPlayer);
       }
       this.tryCompleteWeaponUpgrade(targetPlayer);
+      this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
-      this.rewardChoices = null;
-      this.rewardChest = null;
-      this.rewardPicker = null;
+      if (this.rewardChest.stock.length === 0) {
+        this.combat.floatText(targetPlayer.x, targetPlayer.y - 84, "Shop sold out", "#afa89e");
+        this.rewardChoices = null;
+        this.rewardChest = null;
+        this.rewardPicker = null;
+        return;
+      }
+      this.rewardChoices = this.rewardChest.stock;
       return;
     }
     if (!applyReward(targetPlayer, reward)) {
@@ -6209,12 +6304,26 @@ class Game {
         continue;
       }
 
-      if (target.type === "chest" || target.type === "shop") {
+      if (target.type === "chest") {
         target.opened = true;
         this.rewardChest = target;
         this.rewardPicker = player;
-        this.rewardChoices = target.type === "shop" ? rollShopOptions(player, 3) : rollRewardOptions(player, 3, target.rarity);
+        this.rewardChoices = rollRewardOptions(player, 3, target.rarity);
         this.loot = this.loot.filter((item) => item.id !== target.id);
+        return;
+      }
+
+      if (target.type === "shop") {
+        if (!target.stock) {
+          target.stock = rollShopOptions(player, 3);
+        }
+        if (target.stock.length === 0) {
+          this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
+          return;
+        }
+        this.rewardChest = target;
+        this.rewardPicker = player;
+        this.rewardChoices = target.stock;
         return;
       }
 
@@ -6243,6 +6352,11 @@ class Game {
 
       if (target.type === "blueprint") {
         this.collectBlueprint(player, target);
+        return;
+      }
+
+      if (target.type === "material") {
+        this.collectMaterial(player, target);
         return;
       }
 
