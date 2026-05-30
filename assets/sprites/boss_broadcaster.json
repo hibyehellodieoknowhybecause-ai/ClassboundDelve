@@ -1,0 +1,45 @@
+{
+  "image": "boss_broadcaster.png",
+  "source": "concepts/broadcaster_boss_64.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 8,
+  "rows": 7,
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 4,
+      "fps": 5
+    },
+    "walk": {
+      "row": 1,
+      "frames": 4,
+      "fps": 8
+    },
+    "micDrop": {
+      "row": 2,
+      "frames": 6,
+      "fps": 12
+    },
+    "table": {
+      "row": 3,
+      "frames": 6,
+      "fps": 10
+    },
+    "phone": {
+      "row": 4,
+      "frames": 6,
+      "fps": 12
+    },
+    "liveStream": {
+      "row": 5,
+      "frames": 8,
+      "fps": 14
+    },
+    "hurt": {
+      "row": 6,
+      "frames": 2,
+      "fps": 6
+    }
+  }
+}

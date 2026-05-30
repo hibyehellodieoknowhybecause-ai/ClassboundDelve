@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Dungeon Class Prototype</title>
+    <link rel="stylesheet" href="./src/styles.css" />
+  </head>
+  <body>
+    <main id="app">
+      <canvas id="game" width="1280" height="720" aria-label="Dungeon game canvas"></canvas>
+
+      <div id="touchControls" class="touch-controls hidden" aria-label="Touch controls">
+        <button class="touch-settings" type="button" data-touch-action="settings" aria-label="Settings">SET</button>
+        <div id="touchStick" class="touch-stick" aria-label="Move">
+          <div id="touchStickKnob" class="touch-stick-knob"></div>
+        </div>
+        <div class="touch-actions" aria-label="Actions">
+          <button class="touch-button secondary-action" type="button" data-touch-action="interact">USE</button>
+          <button class="touch-button secondary-action" type="button" data-touch-action="dash">DASH</button>
+          <button class="touch-button primary-action" type="button" data-touch-action="autoAimAttack">ATK</button>
+          <button class="touch-button secondary-action" type="button" data-touch-action="ability">ULT</button>
+          <button class="touch-button secondary-action" type="button" data-touch-action="extraAbility">EVO</button>
+        </div>
+      </div>
+
+      <section id="menu" class="overlay">
+        <div class="panel menu-panel">
+          <p class="eyebrow">Desktop dungeon prototype</p>
+          <h1>Classbound Delve</h1>
+          <div class="lobby-preview" aria-hidden="true">
+            <div class="lobby-figure mannequin"></div>
+            <div class="lobby-figure swordsman"></div>
+            <div class="lobby-gate"></div>
+            <div class="lobby-figure archer"></div>
+            <div class="lobby-spot"></div>
+          </div>
+          <div class="menu-actions">
+            <button id="startGame" class="primary">Enter Lobby 1P</button>
+            <button id="startCoop" class="primary">Enter Lobby 2P</button>
+            <button id="openSettings" class="secondary">Settings</button>
+          </div>
+        </div>
+      </section>
+
+      <section id="settings" class="overlay hidden">
+        <div class="panel settings-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Run Menu</p>
+              <h2>Settings</h2>
+            </div>
+            <button id="closeSettings" class="icon-button" title="Close settings">X</button>
+          </div>
+
+          <div class="settings-tabs" role="tablist" aria-label="Settings sections">
+            <button id="controlsTab" class="tab-button active" type="button">Controls</button>
+            <button id="secretCodesTab" class="tab-button" type="button">Secret Codes</button>
+          </div>
+
+          <div id="controlsPanel" class="settings-section">
+            <div id="keybindRows" class="keybind-list"></div>
+            <div class="settings-actions">
+              <button id="resetKeybinds" class="secondary">Reset Defaults</button>
+              <button id="saveSettings" class="primary">Save</button>
+            </div>
+          </div>
+
+          <div id="secretCodesPanel" class="settings-section hidden">
+            <form id="secretCodeForm" class="secret-code-form">
+              <label for="secretCodeInput">Secret code</label>
+              <div class="input-row">
+                <input id="secretCodeInput" type="text" autocomplete="off" spellcheck="false" />
+                <button id="submitSecretCode" class="primary" type="submit">Submit</button>
+              </div>
+              <p id="secretCodeMessage" class="secret-code-message"></p>
+            </form>
+
+            <form id="coinPrompt" class="coin-prompt hidden">
+              <label for="coinAmountInput">How many coins?</label>
+              <div class="input-row">
+                <input id="coinAmountInput" type="number" min="0" step="1" />
+                <button id="grantCoins" class="primary" type="submit">Grant</button>
+                <button id="cancelCoins" class="secondary" type="button">Cancel</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </section>
+
+      <section id="gameOver" class="overlay hidden">
+        <div class="panel end-panel">
+          <p class="eyebrow">Run ended</p>
+          <h2 id="gameOverTitle">Defeated</h2>
+          <p id="gameOverStats"></p>
+          <button id="restartGame" class="primary">Back to Lobby Entrance</button>
+        </div>
+      </section>
+    </main>
+
+    <script type="module" src="./src/main.js"></script>
+  </body>
+</html>

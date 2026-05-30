@@ -1,0 +1,37 @@
+{
+  "image": "swordsman.png",
+  "source": "concepts/swordsman_ai_enhanced_64.png",
+  "frameWidth": 64,
+  "frameHeight": 64,
+  "columns": 8,
+  "rows": 5,
+  "weaponPolicy": "Character body only. Draw equipped weapon separately.",
+  "animations": {
+    "idle": {
+      "row": 0,
+      "frames": 4,
+      "fps": 5
+    },
+    "walk": {
+      "row": 1,
+      "frames": 4,
+      "fps": 8
+    },
+    "attack": {
+      "row": 2,
+      "frames": 4,
+      "fps": 12
+    },
+    "whirlwind": {
+      "row": 3,
+      "frames": 8,
+      "fps": 18
+    },
+    "hurt": {
+      "row": 4,
+      "frames": 2,
+      "fps": 6,
+      "note": "second frame is a horizontal flip of the first"
+    }
+  }
+}
