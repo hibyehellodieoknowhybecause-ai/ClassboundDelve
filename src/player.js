@@ -449,6 +449,7 @@ export class Player {
         damage,
         life: weapon.projectileLife,
         slow: weapon.slow ?? 0,
+        sprite: weapon.id === "elmLongbow" && this.character.classId === "archer" && !this.secretWeapon ? "iceArrow" : null,
         color: this.secretWeapon ? "#f2b85b" : this.character.accent
       });
     }
