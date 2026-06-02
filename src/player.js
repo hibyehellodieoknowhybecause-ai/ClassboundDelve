@@ -125,6 +125,7 @@ export class Player {
     this.poisonTrailTimer = 0;
     this.petSpeedBoost = 0;
     this.petDamageBoost = 0;
+    this.fairyBuffTimer = 0;
     this.bodyguardState = {
       active: false,
       timer: 0,
@@ -169,7 +170,8 @@ export class Player {
     if (!this.ability) {
       return 0;
     }
-    return this.ability.cooldown * (1 - Math.min(0.55, this.statBonuses.abilityCooldown));
+    const fairyCooldown = this.fairyBuffTimer > 0 ? 0.2 : 0;
+    return this.ability.cooldown * (1 - Math.min(0.65, this.statBonuses.abilityCooldown + fairyCooldown));
   }
 
   abilityCooldownValue() {
@@ -189,7 +191,8 @@ export class Player {
 
   weaponCooldown() {
     const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
-    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.75, this.statBonuses.attackSpeed + lastStandSpeed));
+    const fairySpeed = this.fairyBuffTimer > 0 ? 0.25 : 0;
+    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.8, this.statBonuses.attackSpeed + lastStandSpeed + fairySpeed));
   }
 
   attackDamageBonus() {
@@ -204,7 +207,8 @@ export class Player {
       return this.weapon.damage ?? 9999;
     }
     const lastStandDamage = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
-    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus() + lastStandDamage);
+    const fairyDamage = this.fairyBuffTimer > 0 ? 0.45 : 0;
+    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus() + lastStandDamage + fairyDamage);
   }
 
   update(dt, input, camera, room, combat) {
@@ -223,6 +227,10 @@ export class Player {
     this.slowed = Math.max(0, this.slowed - dt);
     this.petSpeedBoost = Math.max(0, this.petSpeedBoost - dt);
     this.petDamageBoost = Math.max(0, this.petDamageBoost - dt);
+    this.fairyBuffTimer = Math.max(0, this.fairyBuffTimer - dt);
+    if (this.fairyBuffTimer > 0 && this.hp < this.maxHp) {
+      this.heal(this.maxHp * 0.02 * dt);
+    }
     if (this.statBonuses.regen > 0 && this.hp < this.maxHp) {
       this.heal(this.maxHp * this.statBonuses.regen * dt);
     }
@@ -276,7 +284,8 @@ export class Player {
 
     const slowMultiplier = this.slowed > 0 ? 0.58 : 1;
     const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.15 : 0;
-    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed + (this.petSpeedBoost > 0 ? 0.2 : 0);
+    const fairySpeed = this.fairyBuffTimer > 0 ? 0.25 : 0;
+    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed + (this.petSpeedBoost > 0 ? 0.2 : 0) + fairySpeed;
     const speed = (this.dashing > 0 ? this.character.dashSpeed : this.character.speed) * speedBonus * slowMultiplier;
     this.dashing = Math.max(0, this.dashing - dt);
     this.x += move.x * speed * dt;
@@ -660,6 +669,18 @@ export class Player {
       pet.x = this.x + Math.cos(pet.angle + i * 2.1) * 48;
       pet.y = this.y + Math.sin(pet.angle + i * 2.1) * 34;
       pet.cooldown = Math.max(0, pet.cooldown - dt);
+      if (pet.fairyAuraCooldown !== undefined) {
+        pet.fairyAuraCooldown = Math.max(0, pet.fairyAuraCooldown - dt);
+        if (pet.fairyAuraCooldown <= 0) {
+          this.fairyBuffTimer = Math.max(this.fairyBuffTimer, 5);
+          this.petDamageBoost = Math.max(this.petDamageBoost, 5);
+          this.petSpeedBoost = Math.max(this.petSpeedBoost, 5);
+          this.heal(Math.max(4, this.maxHp * 0.08));
+          this.invulnerable = Math.max(this.invulnerable, 0.6);
+          combat.floatText(this.x, this.y - 96, "Fairy blessing", pet.color);
+          pet.fairyAuraCooldown = 6;
+        }
+      }
       if (pet.speedPulse) {
         pet.speedPulseCooldown = Math.max(0, (pet.speedPulseCooldown ?? 0) - dt);
         if (pet.speedPulseCooldown <= 0) {
@@ -697,6 +718,7 @@ export class Player {
 
       combat.spawnProjectile({
         owner: this,
+        petId: pet.id,
         faction: "player",
         x: pet.x,
         y: pet.y,
@@ -705,27 +727,20 @@ export class Player {
         radius: 6,
         damage: this.petDamage(pet),
         life: 0.75,
-        slow: pet.slow ?? 0,
-        poison: pet.poison,
-        bleed: pet.bleed,
+        slow: pet.id === "epicFish" || pet.id === "companionSpark" ? pet.slow ?? 0 : 0,
+        poison: pet.id === "epicSnake" ? pet.poison : null,
+        bleed: pet.id === "epicTiger" ? pet.bleed : null,
         color: pet.color
       });
-      if (pet.healPulse) {
-        this.heal(Math.max(1, this.maxHp * 0.01));
-      }
-      if (pet.buffPulse) {
-        this.petDamageBoost = Math.max(this.petDamageBoost, 2.5);
-        combat.floatText(this.x, this.y - 92, "Fairy buff", pet.color);
-      }
       pet.cooldown = pet.cooldownMax ?? 1.05;
     }
   }
 
   petDamage(pet) {
     if (pet.bodyguard) {
-      return this.attackDamage() * (pet.damageRatio ?? 0.3) * (1 + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.2 : 0));
+      return this.attackDamage() * (pet.damageRatio ?? 0.3) * (1 + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.6 : 0));
     }
-    return (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.2 : 0));
+    return (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.6 : 0));
   }
 
   updateBodyguards(dt, combat) {
@@ -782,7 +797,8 @@ export class Player {
     if (this.invulnerable > 0) {
       return false;
     }
-    const damageTaken = amount * (1 - Math.min(0.6, this.statBonuses.damageReduction)) * (this.passives.has("poisonTrail") ? 1.1 : 1);
+    const fairyReduction = this.fairyBuffTimer > 0 ? 0.25 : 0;
+    const damageTaken = amount * (1 - Math.min(0.75, this.statBonuses.damageReduction + fairyReduction)) * (this.passives.has("poisonTrail") ? 1.1 : 1);
     this.hp = Math.max(0, this.hp - damageTaken);
     if (this.hp > 0 && this.passives.has("phoenixBlood") && this.phoenixBloodAvailable && this.hp / this.maxHp < 0.35) {
       this.phoenixBloodAvailable = false;
@@ -881,6 +897,7 @@ export class Player {
     this.poisonTrailTimer = 0;
     this.petSpeedBoost = 0;
     this.petDamageBoost = 0;
+    this.fairyBuffTimer = 0;
     this.bodyguardState = {
       active: false,
       timer: 0,

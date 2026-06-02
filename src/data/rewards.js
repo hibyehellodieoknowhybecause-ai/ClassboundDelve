@@ -82,7 +82,7 @@ function addEpicEgg(player) {
   }
   const roll = Math.random();
   const pet =
-    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f6f1e8", damage: 10, cooldownMax: 1.35, healPulse: true, buffPulse: true } :
+    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f6f1e8", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } :
     roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#5ec28c", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } :
     roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#f2b85b", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } :
     roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#73a9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } :
