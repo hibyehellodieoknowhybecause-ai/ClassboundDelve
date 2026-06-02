@@ -58,6 +58,7 @@ http://localhost:4173
   - Higher rarity chests have better odds for rare/legendary rewards.
   - Bosses drop higher rarity chests.
   - Enemies have a 5% chance to drop a health pot.
+  - Enemies begin regenerating health if they go 5 seconds without being attacked.
   - Press `F` near a chest to open three gacha reward choices.
   - Press `F` near a shop to browse paid stock, then press interact or `Esc` to leave without buying.
   - Buying Sealed Errand opens a hidden quest portal.

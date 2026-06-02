@@ -352,6 +352,14 @@ export class Renderer {
       ctx.stroke();
     }
 
+    if (enemy.regenerating) {
+      ctx.strokeStyle = "#5ec28c";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 16, -Math.PI / 2, Math.PI * 1.5);
+      ctx.stroke();
+    }
+
     if (enemy.state === "windup") {
       ctx.strokeStyle = "#f2b85b";
       ctx.lineWidth = 4;

@@ -313,6 +313,8 @@ function nearestTarget(source, targets) {
 
 function damageEnemy(enemy, damage, source, knockback = 0) {
   enemy.hp -= damage;
+  enemy.timeSinceHit = 0;
+  enemy.regenerating = false;
   if (knockback > 0) {
     const dir = normalize(enemy.x - source.x, enemy.y - source.y);
     enemy.x += dir.x * knockback * 0.08;

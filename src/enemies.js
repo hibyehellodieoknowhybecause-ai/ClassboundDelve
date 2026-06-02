@@ -201,6 +201,8 @@ const enemyKinds = {
 };
 
 const postBossEnemyUnlocks = ["duelist", "seer", "mender", "shade", "bulwark"];
+const ENEMY_REGEN_DELAY = 5;
+const ENEMY_REGEN_RATE = 0.08;
 
 export function createEnemies(stage) {
   const enemies = [];
@@ -230,6 +232,7 @@ export function updateEnemies(enemies, players, dt, room, combat) {
   for (const enemy of enemies) {
     const player = nearestPlayer(enemy, livePlayers);
     tickEnemyTimers(enemy, dt);
+    updateEnemyRegeneration(enemy, dt);
     updatePerception(enemy, player);
 
     if (enemy.frozen <= 0) {
@@ -282,6 +285,8 @@ function createEnemy(type, stage, x, y) {
       phase: 0,
       shieldTimer: 0,
       supporterTimer: isBroadcaster ? 4.5 : Infinity,
+      timeSinceHit: 0,
+      regenerating: false,
       spriteAction: "idle",
       color: isBroadcaster ? "#263a74" : "#a747d9",
       habit: isBroadcaster ? "uses media-themed attacks and summons supporters" : "tracks the whole room and alternates bullet patterns"
@@ -306,6 +311,8 @@ function createEnemy(type, stage, x, y) {
     alert: type === "supporter",
     state: type === "supporter" ? "chase" : "wander",
     stateTimer: 0,
+    timeSinceHit: 0,
+    regenerating: false,
     wander: newWander(),
     strafeDir: Math.random() < 0.5 ? -1 : 1,
     charge: null
@@ -323,6 +330,17 @@ function tickEnemyTimers(enemy, dt) {
   if (enemy.wander) {
     enemy.wander.timer -= dt;
   }
+}
+
+function updateEnemyRegeneration(enemy, dt) {
+  enemy.timeSinceHit = (enemy.timeSinceHit ?? 0) + dt;
+  enemy.regenerating = false;
+  if (enemy.hp <= 0 || enemy.hp >= enemy.maxHp || enemy.timeSinceHit < ENEMY_REGEN_DELAY) {
+    return;
+  }
+
+  enemy.regenerating = true;
+  enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * ENEMY_REGEN_RATE * dt);
 }
 
 function updatePerception(enemy, player) {
