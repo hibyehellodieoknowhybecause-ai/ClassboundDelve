@@ -252,6 +252,9 @@ export class CombatSystem {
       for (const enemy of enemies) {
         if (enemy.hp > 0 && distance(patch, enemy) <= patch.radius + enemy.radius) {
           enemy.slowed = Math.max(enemy.slowed ?? 0, patch.slow);
+          if (patch.damagePerSecond) {
+            this.hitEnemy(enemy, patch.damagePerSecond * dt, patch, 0);
+          }
         }
       }
     }
@@ -315,6 +318,13 @@ function damageEnemy(enemy, damage, source, knockback = 0) {
   enemy.hp -= damage;
   enemy.timeSinceHit = 0;
   enemy.regenerating = false;
+  const owner = source?.owner ?? source;
+  if (owner?.statBonuses?.lifesteal > 0 && owner.heal) {
+    owner.heal(damage * owner.statBonuses.lifesteal);
+  }
+  if (owner?.statBonuses?.stunChance > 0 && Math.random() < owner.statBonuses.stunChance) {
+    enemy.frozen = Math.max(enemy.frozen ?? 0, 0.55);
+  }
   if (knockback > 0) {
     const dir = normalize(enemy.x - source.x, enemy.y - source.y);
     enemy.x += dir.x * knockback * 0.08;

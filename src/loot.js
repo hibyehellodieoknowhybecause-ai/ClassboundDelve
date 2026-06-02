@@ -4,15 +4,17 @@ import { chestTiers } from "./data/rewards.js";
 const roomChestWeights = {
   common: 58,
   uncommon: 31,
-  rare: 10,
+  rare: 9,
+  epic: 1,
   legendary: 1
 };
 
 const bossChestWeights = {
   common: 0,
-  uncommon: 24,
-  rare: 52,
-  legendary: 24
+  uncommon: 18,
+  rare: 46,
+  epic: 24,
+  legendary: 12
 };
 
 export function createRewardChest(x, y, source = "reward chest", rarity = "common") {
@@ -218,8 +220,9 @@ export function nearestInteractable(loot, player) {
       continue;
     }
     const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;
+    const bonusReach = player.passives?.has("magnetCharm") ? reach * 2 : reach;
     const dist = distance(item, player);
-    if (dist <= reach && dist < bestDistance) {
+    if (dist <= bonusReach && dist < bestDistance) {
       best = item;
       bestDistance = dist;
     }

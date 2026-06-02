@@ -1127,16 +1127,44 @@ function completeWeaponUpgrade(player) {
   return blueprint;
 }
 
+function addPet(player, pet) {
+  player.pets.push({
+    angle: Math.random() * Math.PI * 2,
+    cooldown: 0.6,
+    ...pet
+  });
+}
+
+function addEpicEgg(player) {
+  const maxEggs = player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched") ? 5 : 6;
+  if (player.rewardCount("epicEgg") >= maxEggs) {
+    return;
+  }
+  const roll = Math.random();
+  const pet =
+    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f6f1e8", damage: 10, cooldownMax: 1.35, healPulse: true } :
+    roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#5ec28c", damage: 15, cooldownMax: 0.95, slow: 0.4 } :
+    roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#f2b85b", damage: 14, cooldownMax: 0.85, speedPulse: true } :
+    roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#73a9ff", damage: 13, cooldownMax: 1.0, slow: 1.0 } :
+    roll < 0.81 ? { id: "epicTiger", name: "Epic Tiger", color: "#d95757", damage: 18, cooldownMax: 1.1 } :
+    { id: "epicTortoise", name: "Epic Tortoise", color: "#8d5a38", damage: 12, cooldownMax: 1.25 };
+  if (pet.id === "mythicalFairy") {
+    player.passives.add("fairyHatched");
+  }
+  addPet(player, pet);
+}
+
 const rewardPool = [
   {
-    id: "maxHp",
+    id: "heartCoreCommon",
     type: "Stat",
     name: "Heart Core",
     rarity: "common",
-    description: "+24 max HP and heal 24 HP.",
+    description: "+10% max HP and heal 10% HP.",
     apply(player) {
-      player.maxHp += 24;
-      player.hp = Math.min(player.maxHp, player.hp + 24);
+      const gain = Math.ceil(player.maxHp * 0.1);
+      player.maxHp += gain;
+      player.hp = Math.min(player.maxHp, player.hp + gain);
     }
   },
   {
@@ -1144,9 +1172,9 @@ const rewardPool = [
     type: "Stat",
     name: "Sharpened Focus",
     rarity: "common",
-    description: "+16% attack damage.",
+    description: "+10% attack damage.",
     apply(player) {
-      player.statBonuses.attackDamage += 0.16;
+      player.statBonuses.attackDamage += 0.1;
     }
   },
   {
@@ -1154,9 +1182,10 @@ const rewardPool = [
     type: "Stat",
     name: "Quick Hands",
     rarity: "common",
-    description: "Weapon cooldown is 12% faster.",
+    maxCount: 3,
+    description: "Weapon cooldown is 10% faster.",
     apply(player) {
-      player.statBonuses.attackSpeed += 0.12;
+      player.statBonuses.attackSpeed += 0.1;
     }
   },
   {
@@ -1164,9 +1193,78 @@ const rewardPool = [
     type: "Stat",
     name: "Fleet Boots",
     rarity: "common",
+    maxCount: 10,
     description: "+9% movement speed.",
     apply(player) {
       player.statBonuses.moveSpeed += 0.09;
+    }
+  },
+  {
+    id: "sprinter",
+    type: "Stat",
+    name: "Sprinter",
+    rarity: "common",
+    maxCount: 10,
+    description: "+10% dash distance.",
+    apply(player) {
+      player.statBonuses.dashDistance += 0.1;
+    }
+  },
+  {
+    id: "steadyAim",
+    type: "Stat",
+    classId: "archer",
+    name: "Steady Aim",
+    rarity: "common",
+    maxCount: 3,
+    description: "+20% projectile speed.",
+    apply(player) {
+      player.statBonuses.projectileSpeed += 0.2;
+    }
+  },
+  {
+    id: "magnetCharm",
+    type: "Passive",
+    name: "Magnet Charm",
+    rarity: "common",
+    maxCount: 1,
+    description: "Interact with health pots, chests, shops, and drops from twice as far away.",
+    apply(player) {
+      player.passives.add("magnetCharm");
+    }
+  },
+  {
+    id: "phoenixBlood",
+    type: "Passive",
+    name: "Phoenix Blood",
+    rarity: "uncommon",
+    maxCount: 1,
+    description: "Once per room below 35% HP, heal 10% max HP.",
+    apply(player) {
+      player.passives.add("phoenixBlood");
+      player.phoenixBloodAvailable = true;
+    }
+  },
+  {
+    id: "momentumGuard",
+    type: "Passive",
+    name: "Momentum Guard",
+    rarity: "uncommon",
+    maxCount: 1,
+    description: "After dashing, gain 0.2s extra invulnerability.",
+    apply(player) {
+      player.passives.add("momentumGuard");
+    }
+  },
+  {
+    id: "coinSense",
+    type: "Passive",
+    name: "Coin Sense",
+    rarity: "uncommon",
+    maxCount: 2,
+    description: "Coins from enemies +1.",
+    apply(player) {
+      player.statBonuses.enemyCoins += 1;
     }
   },
   {
@@ -1174,6 +1272,7 @@ const rewardPool = [
     type: "Stat",
     name: "Dash Training",
     rarity: "uncommon",
+    maxCount: 3,
     description: "Dash cooldown is 18% faster.",
     apply(player) {
       player.statBonuses.dashCooldown += 0.18;
@@ -1181,22 +1280,57 @@ const rewardPool = [
   },
   {
     id: "ultimateBattery",
-    type: "Ability",
+    type: "Stat",
     name: "Ultimate Battery",
     rarity: "uncommon",
-    description: "Ultimate cooldown is 15% faster.",
+    maxCount: 3,
+    description: "Ultimate cooldown is 10% faster.",
     apply(player) {
-      player.statBonuses.abilityCooldown += 0.15;
+      player.statBonuses.abilityCooldown += 0.1;
     }
   },
   {
     id: "potionBelt",
-    type: "Passive",
+    type: "Stat",
     name: "Potion Belt",
     rarity: "uncommon",
-    description: "Health pots heal 35% more.",
+    maxCount: 4,
+    description: "Health pots heal 25% more.",
     apply(player) {
-      player.passives.add("potionBelt");
+      player.statBonuses.potionHeal += 0.25;
+    }
+  },
+  {
+    id: "armor",
+    type: "Stat",
+    name: "Armor",
+    rarity: "uncommon",
+    maxCount: 5,
+    description: "Take 7.5% less damage.",
+    apply(player) {
+      player.statBonuses.damageReduction += 0.075;
+    }
+  },
+  {
+    id: "sharpenedFocus2",
+    type: "Stat",
+    name: "Sharpened Focus 2",
+    rarity: "uncommon",
+    description: "+25% attack damage.",
+    apply(player) {
+      player.statBonuses.attackDamage += 0.25;
+    }
+  },
+  {
+    id: "heartCoreUncommon",
+    type: "Stat",
+    name: "Heart Core",
+    rarity: "uncommon",
+    description: "+25% max HP and heal 25% HP.",
+    apply(player) {
+      const gain = Math.ceil(player.maxHp * 0.25);
+      player.maxHp += gain;
+      player.hp = Math.min(player.maxHp, player.hp + gain);
     }
   },
   {
@@ -1204,6 +1338,7 @@ const rewardPool = [
     type: "Passive",
     name: "Second Heart",
     rarity: "rare",
+    maxCount: 1,
     description: "Once per run, lethal damage revives you at 45% HP.",
     apply(player) {
       player.passives.add("secondHeart");
@@ -1211,31 +1346,95 @@ const rewardPool = [
     }
   },
   {
+    id: "cleanStrikes",
+    type: "Passive",
+    name: "Clean Strikes",
+    rarity: "rare",
+    maxCount: 1,
+    description: "+10% damage. First hit after dashing deals +30% damage.",
+    apply(player) {
+      player.statBonuses.attackDamage += 0.1;
+      player.passives.add("cleanStrikes");
+    }
+  },
+  {
+    id: "lastStand",
+    type: "Passive",
+    name: "Last Stand",
+    rarity: "rare",
+    maxCount: 1,
+    description: "Under 30% HP, gain speed, damage, and attack speed.",
+    apply(player) {
+      player.passives.add("lastStand");
+    }
+  },
+  {
+    id: "healUp",
+    type: "Passive",
+    name: "Heal Up",
+    rarity: "rare",
+    maxCount: 2,
+    description: "Health pot drop rates increase by 100%.",
+    apply(player) {
+      player.statBonuses.healthPotDrops += 1;
+    }
+  },
+  {
+    id: "regenerate",
+    type: "Passive",
+    name: "Regenerate",
+    rarity: "rare",
+    maxCount: 5,
+    description: "Restore 1% max HP per second.",
+    apply(player) {
+      player.statBonuses.regen += 0.01;
+    }
+  },
+  {
+    id: "companionSpark",
+    type: "Pet",
+    name: "Companion Spark",
+    rarity: "rare",
+    maxCount: 1,
+    description: "A pet periodically zaps and slows the nearest enemy.",
+    apply(player) {
+      addPet(player, { id: "companionSpark", name: "Companion Spark", color: "#f2b85b", damage: 10, cooldownMax: 0.85, slow: 0.8 });
+    }
+  },
+  {
     id: "arcaneWisp",
     type: "Pet",
     name: "Arcane Wisp",
     rarity: "rare",
+    maxCount: 1,
     description: "A floating pet follows you and shoots nearby enemies.",
     apply(player) {
-      player.pets.push({
-        id: "arcaneWisp",
-        name: "Arcane Wisp",
-        angle: Math.random() * Math.PI * 2,
-        cooldown: 0.6,
-        color: "#73a9ff"
-      });
+      addPet(player, { id: "arcaneWisp", name: "Arcane Wisp", color: "#73a9ff", damage: 12, cooldownMax: 1.05 });
+    }
+  },
+  {
+    id: "bloodPrice",
+    type: "Stat",
+    name: "Blood Price",
+    rarity: "rare",
+    description: "+80% damage in exchange for 30% max HP.",
+    apply(player) {
+      player.statBonuses.attackDamage += 0.8;
+      player.maxHp = Math.max(1, Math.ceil(player.maxHp * 0.7));
+      player.hp = Math.min(player.hp, player.maxHp);
     }
   },
   {
     id: "ascendantCore",
-    type: "Evolution",
+    type: "Stat",
     name: "Ascendant Core",
-    rarity: "legendary",
-    description: "+20% damage, +12% speed, and ultimate cooldown is 20% faster.",
+    rarity: "rare",
+    maxCount: 3,
+    description: "+15% damage, +10% speed, and ultimate cooldown is 10% faster.",
     apply(player) {
-      player.statBonuses.attackDamage += 0.2;
-      player.statBonuses.moveSpeed += 0.12;
-      player.statBonuses.abilityCooldown += 0.2;
+      player.statBonuses.attackDamage += 0.15;
+      player.statBonuses.moveSpeed += 0.1;
+      player.statBonuses.abilityCooldown += 0.1;
     }
   },
   {
@@ -1244,7 +1443,7 @@ const rewardPool = [
     classId: "swordsman",
     grantsExtraAbility: true,
     name: "Guard Breaker",
-    rarity: "uncommon",
+    rarity: "rare",
     description: "Unlock an extra swordsman ability: an invincible spear dash that pierces enemies.",
     apply(player) {
       player.abilityMods.pullRadius += 45;
@@ -1269,7 +1468,7 @@ const rewardPool = [
     classId: "archer",
     grantsExtraAbility: true,
     name: "Arrow Storm",
-    rarity: "uncommon",
+    rarity: "rare",
     description: "Unlock an extra archer ability: a volley of arrows that leaves slowing ice patches.",
     apply(player) {
       player.abilityMods.netRadius += 42;
@@ -1287,27 +1486,212 @@ const rewardPool = [
     apply(player) {
       player.abilityUpgrades.add("netThorns");
     }
+  },
+  {
+    id: "poisonTrail",
+    type: "Passive",
+    name: "Poison Trail",
+    rarity: "epic",
+    maxCount: 1,
+    description: "Leave poison while moving. You take 10% more damage.",
+    apply(player) {
+      player.passives.add("poisonTrail");
+    }
+  },
+  {
+    id: "combo",
+    type: "Passive",
+    name: "Combo",
+    rarity: "epic",
+    maxCount: 1,
+    description: "Every fifth attack deals an additional 100% damage.",
+    apply(player) {
+      player.passives.add("combo");
+    }
+  },
+  {
+    id: "tanky",
+    type: "Stat",
+    name: "Tanky",
+    rarity: "epic",
+    maxCount: 5,
+    description: "Max HP +100%.",
+    apply(player) {
+      player.maxHp *= 2;
+      player.hp *= 2;
+    }
+  },
+  {
+    id: "buff",
+    type: "Stat",
+    name: "Buff",
+    rarity: "epic",
+    maxCount: 5,
+    description: "Damage +100%.",
+    apply(player) {
+      player.statBonuses.attackDamage += 1;
+    }
+  },
+  {
+    id: "zoom",
+    type: "Stat",
+    name: "Zoom",
+    rarity: "epic",
+    maxCount: 3,
+    description: "Speed +50%.",
+    apply(player) {
+      player.statBonuses.moveSpeed += 0.5;
+    }
+  },
+  {
+    id: "bodyguards",
+    type: "Ability",
+    name: "Bodyguards",
+    rarity: "epic",
+    maxCount: 1,
+    description: "Summon 2 bodyguards as pet allies.",
+    apply(player) {
+      player.passives.add("bodyguards");
+      addPet(player, { id: "bodyguardA", name: "Bodyguard", color: "#afa89e", damage: 9, cooldownMax: 1.1 });
+      addPet(player, { id: "bodyguardB", name: "Bodyguard", color: "#afa89e", damage: 9, cooldownMax: 1.1 });
+    }
+  },
+  {
+    id: "bodyguards2",
+    type: "Ability",
+    name: "Bodyguards 2",
+    rarity: "epic",
+    maxCount: 3,
+    requiresReward: "bodyguards",
+    description: "Add 2 more bodyguards and improve pet damage.",
+    apply(player) {
+      player.statBonuses.petDamage += 0.1;
+      addPet(player, { id: `bodyguard-${player.rewardCount("bodyguards2")}-a`, name: "Bodyguard", color: "#afa89e", damage: 10, cooldownMax: 1.05 });
+      addPet(player, { id: `bodyguard-${player.rewardCount("bodyguards2")}-b`, name: "Bodyguard", color: "#afa89e", damage: 10, cooldownMax: 1.05 });
+    }
+  },
+  {
+    id: "bigAttack",
+    type: "Stat",
+    name: "Woah, that's big",
+    rarity: "epic",
+    maxCount: 3,
+    description: "Attack range and size increase by 30%.",
+    apply(player) {
+      player.statBonuses.rangeSize += 0.3;
+    }
+  },
+  {
+    id: "armyDrills",
+    type: "Stat",
+    name: "Army Drills",
+    rarity: "epic",
+    maxCount: 5,
+    description: "Pets and summons deal 20% more damage.",
+    apply(player) {
+      player.statBonuses.petDamage += 0.2;
+    }
+  },
+  {
+    id: "reload",
+    type: "Stat",
+    name: "Reload",
+    rarity: "epic",
+    maxCount: 1,
+    description: "Skill cooldown -30%.",
+    apply(player) {
+      player.statBonuses.abilityCooldown += 0.3;
+    }
+  },
+  {
+    id: "epicEgg",
+    type: "Pet",
+    name: "Epic Egg",
+    rarity: "epic",
+    maxCount: 6,
+    description: "Hatches into an epic pet ally.",
+    apply(player) {
+      addEpicEgg(player);
+    }
+  },
+  {
+    id: "vampiricLegacy",
+    type: "Passive",
+    name: "Vampiric Legacy",
+    rarity: "legendary",
+    maxCount: 3,
+    description: "+1% lifesteal.",
+    apply(player) {
+      player.statBonuses.lifesteal += 0.01;
+    }
+  },
+  {
+    id: "onGuard",
+    type: "Passive",
+    name: "On Guard",
+    rarity: "legendary",
+    maxCount: 1,
+    description: "Every 5 seconds, gain a 1 second invulnerable shield.",
+    apply(player) {
+      player.passives.add("onGuard");
+      player.onGuardTimer = 5;
+    }
+  },
+  {
+    id: "despair",
+    type: "Stat",
+    name: "Despair",
+    rarity: "legendary",
+    maxCount: 2,
+    description: "+10% chance to stun enemies on hit.",
+    apply(player) {
+      player.statBonuses.stunChance += 0.1;
+    }
+  },
+  {
+    id: "steroids",
+    type: "Stat",
+    name: "Steroids",
+    rarity: "legendary",
+    maxCount: 1,
+    description: "Max HP and damage +75%, speed +40%, attack speed +30%.",
+    apply(player) {
+      const gain = Math.ceil(player.maxHp * 0.75);
+      player.maxHp += gain;
+      player.hp += gain;
+      player.statBonuses.attackDamage += 0.75;
+      player.statBonuses.moveSpeed += 0.4;
+      player.statBonuses.attackSpeed += 0.3;
+    }
   }
 ];
 
 const shopPool = [
   {
     id: "shopHealthPot",
-    type: "Shop",
-    name: "Quarter-Heart Flask",
+    type: "Heal",
+    name: "Health pot",
     rarity: "common",
-    cost: 30,
-    description: "Heal 25% max HP immediately.",
+    stockChance: 1,
+    baseCost: 30,
+    description: "Heal 50% max HP immediately.",
     apply(player) {
-      player.heal(Math.ceil(player.maxHp * 0.25));
+      player.heal(Math.ceil(player.maxHp * 0.5));
     }
+  },
+  {
+    ...rewardPool.find((reward) => reward.id === "epicEgg"),
+    stockChance: 0.1,
+    baseCost: 1000,
+    costIncrement: 500
   },
   {
     id: "hiddenQuestline",
     type: "Quest",
     name: "Sealed Errand",
-    rarity: "uncommon",
-    cost: 300,
+    rarity: "rare",
+    stockChance: 0.25,
+    baseCost: 300,
     unique: true,
     description: "Begin a hidden questline. Quest steps arrive later.",
     apply(player) {
@@ -1321,11 +1705,12 @@ const shopPool = [
   {
     id: "weaponAscensionMaterial",
     type: "Material",
-    name: "Weapon Ascension Ore",
-    rarity: "rare",
-    cost: 180,
-    requiresBlueprint: "weaponEvolution",
-    description: "Material for completing weapon upgrade blueprints.",
+    name: "Weapon evolution material",
+    rarity: "uncommon",
+    stockChance: 0.5,
+    baseCost: 200,
+    costIncrement: 50,
+    description: "Gain 1 Weapon Ore.",
     apply(player) {
       player.materials.weapon += 1;
     }
@@ -1333,14 +1718,59 @@ const shopPool = [
   {
     id: "heroAscensionMaterial",
     type: "Material",
-    name: "Hero Ascension Sigil",
-    rarity: "legendary",
-    cost: 220,
-    requiresBlueprint: "heroAscension",
-    description: "Material for future hero ascension crafting.",
+    name: "Hero ascension material",
+    rarity: "uncommon",
+    stockChance: 0.5,
+    baseCost: 300,
+    costIncrement: 50,
+    description: "Gain 1 Hero Sigil.",
     apply(player) {
       player.materials.hero += 1;
     }
+  },
+  {
+    id: "shopCommonChest",
+    type: "Chest",
+    name: "Common Chest",
+    rarity: "common",
+    stockChance: 0.9,
+    baseCost: 100,
+    costIncrement: 100,
+    opensChest: "common",
+    description: "Open a common chest reward."
+  },
+  {
+    id: "shopUncommonChest",
+    type: "Chest",
+    name: "Uncommon Chest",
+    rarity: "uncommon",
+    stockChance: 0.5,
+    baseCost: 200,
+    costIncrement: 125,
+    opensChest: "uncommon",
+    description: "Open an uncommon chest reward."
+  },
+  {
+    id: "shopRareChest",
+    type: "Chest",
+    name: "Rare Chest",
+    rarity: "rare",
+    stockChance: 0.25,
+    baseCost: 500,
+    costIncrement: 250,
+    opensChest: "rare",
+    description: "Open a rare chest reward."
+  },
+  {
+    id: "shopEpicChest",
+    type: "Chest",
+    name: "Epic Chest",
+    rarity: "epic",
+    stockChance: 0.1,
+    baseCost: 1000,
+    costIncrement: 500,
+    opensChest: "epic",
+    description: "Open an epic chest reward."
   }
 ];
 
@@ -1348,6 +1778,7 @@ const rewardColors = {
   common: "#f6f1e8",
   uncommon: "#5ec28c",
   rare: "#73a9ff",
+  epic: "#a747d9",
   legendary: "#f2b85b"
 };
 
@@ -1355,22 +1786,27 @@ const chestTiers = {
   common: {
     name: "Common Chest",
     color: "#8d5a38",
-    rewardWeights: { common: 64, uncommon: 28, rare: 7, legendary: 1 }
+    rewardWeights: { common: 64, uncommon: 28, rare: 7, epic: 1 }
   },
   uncommon: {
     name: "Uncommon Chest",
     color: "#3d8f62",
-    rewardWeights: { common: 42, uncommon: 39, rare: 16, legendary: 3 }
+    rewardWeights: { common: 42, uncommon: 39, rare: 16, epic: 3 }
   },
   rare: {
     name: "Rare Chest",
     color: "#386fc5",
-    rewardWeights: { common: 22, uncommon: 40, rare: 31, legendary: 7 }
+    rewardWeights: { common: 22, uncommon: 40, rare: 31, epic: 7 }
+  },
+  epic: {
+    name: "Epic Chest",
+    color: "#7d3bb4",
+    rewardWeights: { common: 13, uncommon: 19, rare: 35, epic: 25, legendary: 8 }
   },
   legendary: {
     name: "Legendary Chest",
     color: "#c98b21",
-    rewardWeights: { common: 8, uncommon: 26, rare: 48, legendary: 18 }
+    rewardWeights: { uncommon: 8, rare: 26, epic: 48, legendary: 18 }
   }
 };
 
@@ -1379,7 +1815,20 @@ function rollRewardOptions(player, count = 3, chestRarity = "common") {
 }
 
 function rollShopOptions(player, count = 3) {
-  return rollOptions(player, shopPool, Math.max(1, Math.ceil(Math.random() * count)), { common: 70, uncommon: 18, rare: 9, legendary: 3 });
+  let stock = filteredPool(player, shopPool)
+    .filter((item) => Math.random() < (item.stockChance ?? 1))
+    .map((item) => withShopCost(player, item));
+  if (stock.length === 0) {
+    const fallback = shopPool.find((item) => item.id === "shopHealthPot");
+    return fallback ? [withShopCost(player, fallback)] : [];
+  }
+  const maxStock = Math.max(1, count + (player.passives.has("luckyPouch") ? 1 : 0));
+  if (stock.length > maxStock) {
+    const always = stock.find((item) => item.id === "shopHealthPot");
+    const rest = stock.filter((item) => item.id !== "shopHealthPot").sort(() => Math.random() - 0.5);
+    stock = always ? [always, ...rest].slice(0, maxStock) : rest.slice(0, maxStock);
+  }
+  return stock;
 }
 
 function rollOptions(player, pool, count, weights) {
@@ -1389,6 +1838,9 @@ function rollOptions(player, pool, count, weights) {
   const maxOptions = Math.min(count, available.length);
   while (options.length < maxOptions) {
     const reward = rollReward(available.filter((candidate) => !used.has(candidate.id)), weights);
+    if (!reward) {
+      break;
+    }
     if (!used.has(reward.id)) {
       options.push(reward);
       used.add(reward.id);
@@ -1408,7 +1860,16 @@ function filteredPool(player, pool) {
     if (reward.requiresBlueprint && !player.blueprints[reward.requiresBlueprint]) {
       return false;
     }
-    if ((reward.unique || reward.type === "Passive" || reward.type === "Ability" || reward.type === "Pet") && player.hasReward(reward.id)) {
+    if (reward.requiresReward && !player.hasReward(reward.requiresReward)) {
+      return false;
+    }
+    if (reward.maxCount !== undefined && player.rewardCount(reward.id) >= reward.maxCount) {
+      return false;
+    }
+    if (reward.maxCount === undefined && ["Passive", "Ability", "Pet", "Evolution"].includes(reward.type) && player.hasReward(reward.id)) {
+      return false;
+    }
+    if (reward.unique && player.hasReward(reward.id)) {
       return false;
     }
     return true;
@@ -1416,7 +1877,19 @@ function filteredPool(player, pool) {
 }
 
 function canApplyReward(player, reward) {
+  if (reward.id === "epicEgg" && player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched")) {
+    return false;
+  }
   if (reward.requiresBlueprint && !player.blueprints[reward.requiresBlueprint]) {
+    return false;
+  }
+  if (reward.requiresReward && !player.hasReward(reward.requiresReward)) {
+    return false;
+  }
+  if (reward.maxCount !== undefined && player.rewardCount(reward.id) >= reward.maxCount) {
+    return false;
+  }
+  if (reward.maxCount === undefined && ["Passive", "Ability", "Pet", "Evolution"].includes(reward.type) && player.hasReward(reward.id)) {
     return false;
   }
   if (reward.grantsExtraAbility) {
@@ -1430,7 +1903,18 @@ function canApplyReward(player, reward) {
   return true;
 }
 
+function withShopCost(player, item) {
+  const bought = player.shopPurchaseCount(item.id);
+  return {
+    ...item,
+    cost: (item.baseCost ?? item.cost ?? 0) + bought * (item.costIncrement ?? 0)
+  };
+}
+
 function rollReward(pool, weights) {
+  if (pool.length === 0) {
+    return null;
+  }
   const total = pool.reduce((sum, reward) => sum + (weights[reward.rarity] ?? 1), 0);
   let pick = Math.random() * total;
   for (const reward of pool) {
@@ -1446,8 +1930,13 @@ function applyReward(player, reward) {
   if (!canApplyReward(player, reward)) {
     return false;
   }
-  reward.apply(player);
+  if (reward.apply) {
+    reward.apply(player);
+  }
   player.rewardHistory.push(reward.id);
+  if (reward.baseCost !== undefined || reward.cost !== undefined) {
+    player.shopHistory.push(reward.id);
+  }
   player.lastReward = reward;
   return true;
 }
@@ -2097,6 +2586,9 @@ class CombatSystem {
       for (const enemy of enemies) {
         if (enemy.hp > 0 && distance(patch, enemy) <= patch.radius + enemy.radius) {
           enemy.slowed = Math.max(enemy.slowed ?? 0, patch.slow);
+          if (patch.damagePerSecond) {
+            this.hitEnemy(enemy, patch.damagePerSecond * dt, patch, 0);
+          }
         }
       }
     }
@@ -2160,6 +2652,13 @@ function damageEnemy(enemy, damage, source, knockback = 0) {
   enemy.hp -= damage;
   enemy.timeSinceHit = 0;
   enemy.regenerating = false;
+  const owner = source?.owner ?? source;
+  if (owner?.statBonuses?.lifesteal > 0 && owner.heal) {
+    owner.heal(damage * owner.statBonuses.lifesteal);
+  }
+  if (owner?.statBonuses?.stunChance > 0 && Math.random() < owner.statBonuses.stunChance) {
+    enemy.frozen = Math.max(enemy.frozen ?? 0, 0.55);
+  }
   if (knockback > 0) {
     const dir = normalize(enemy.x - source.x, enemy.y - source.y);
     enemy.x += dir.x * knockback * 0.08;
@@ -3122,15 +3621,17 @@ function randomSpawn(room) {
 const roomChestWeights = {
   common: 58,
   uncommon: 31,
-  rare: 10,
+  rare: 9,
+  epic: 1,
   legendary: 1
 };
 
 const bossChestWeights = {
   common: 0,
-  uncommon: 24,
-  rare: 52,
-  legendary: 24
+  uncommon: 18,
+  rare: 46,
+  epic: 24,
+  legendary: 12
 };
 
 function createRewardChest(x, y, source = "reward chest", rarity = "common") {
@@ -3336,8 +3837,9 @@ function nearestInteractable(loot, player) {
       continue;
     }
     const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;
+    const bonusReach = player.passives?.has("magnetCharm") ? reach * 2 : reach;
     const dist = distance(item, player);
-    if (dist <= reach && dist < bestDistance) {
+    if (dist <= bonusReach && dist < bestDistance) {
       best = item;
       bestDistance = dist;
     }
@@ -3430,7 +3932,18 @@ class Player {
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
-      abilityCooldown: 0
+      abilityCooldown: 0,
+      dashDistance: 0,
+      projectileSpeed: 0,
+      damageReduction: 0,
+      potionHeal: 0,
+      enemyCoins: 0,
+      healthPotDrops: 0,
+      regen: 0,
+      rangeSize: 0,
+      petDamage: 0,
+      lifesteal: 0,
+      stunChance: 0
     };
     this.abilityMods = {
       pullRadius: 0,
@@ -3450,9 +3963,14 @@ class Player {
     };
     this.pets = [];
     this.rewardHistory = [];
+    this.shopHistory = [];
     this.lastReward = null;
     this.reviveAvailable = false;
     this.dashStrikeReady = false;
+    this.phoenixBloodAvailable = false;
+    this.onGuardTimer = 0;
+    this.basicAttackCount = 0;
+    this.poisonTrailTimer = 0;
   }
 
   get weapon() {
@@ -3473,6 +3991,14 @@ class Player {
 
   hasReward(id) {
     return this.rewardHistory.includes(id);
+  }
+
+  rewardCount(id) {
+    return this.rewardHistory.filter((rewardId) => rewardId === id).length;
+  }
+
+  shopPurchaseCount(id) {
+    return this.shopHistory.filter((rewardId) => rewardId === id).length;
   }
 
   abilityValue(key) {
@@ -3502,7 +4028,8 @@ class Player {
   }
 
   weaponCooldown() {
-    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.65, this.statBonuses.attackSpeed));
+    const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
+    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.75, this.statBonuses.attackSpeed + lastStandSpeed));
   }
 
   attackDamageBonus() {
@@ -3516,7 +4043,8 @@ class Player {
     if (this.weapon?.kind === "nuke") {
       return this.weapon.damage ?? 9999;
     }
-    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus());
+    const lastStandDamage = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
+    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus() + lastStandDamage);
   }
 
   update(dt, input, camera, room, combat) {
@@ -3533,6 +4061,31 @@ class Player {
     }
     this.extraAbilityCooldown = Math.max(0, this.extraAbilityCooldown - dt);
     this.slowed = Math.max(0, this.slowed - dt);
+    if (this.statBonuses.regen > 0 && this.hp < this.maxHp) {
+      this.heal(this.maxHp * this.statBonuses.regen * dt);
+    }
+    if (this.passives.has("onGuard")) {
+      this.onGuardTimer -= dt;
+      if (this.onGuardTimer <= 0) {
+        this.invulnerable = Math.max(this.invulnerable, 1);
+        this.onGuardTimer = 5;
+      }
+    }
+    if (this.passives.has("poisonTrail") && this.isMoving) {
+      this.poisonTrailTimer -= dt;
+      if (this.poisonTrailTimer <= 0) {
+        combat.spawnIcePatch({
+          x: this.x,
+          y: this.y,
+          radius: 42,
+          slow: 0,
+          life: 1.6,
+          damagePerSecond: Math.max(1, this.maxHp * 0.01),
+          color: "#5ec28c"
+        });
+        this.poisonTrailTimer = 0.18;
+      }
+    }
 
     const worldMouse = {
       x: input.mouse.x / (camera.scale ?? 1) + camera.x,
@@ -3551,16 +4104,17 @@ class Player {
     this.animationTime += dt;
 
     if (input.wasPressed(this.controls.dash) && this.dashTimer <= 0) {
-      this.dashing = 0.16;
-      this.invulnerable = 0.28;
+      this.dashing = 0.16 * (1 + this.statBonuses.dashDistance);
+      this.invulnerable = 0.28 + (this.passives.has("momentumGuard") ? 0.2 : 0);
       this.dashTimer = this.character.dashCooldown * (1 - Math.min(0.55, this.statBonuses.dashCooldown));
-      if (this.passives.has("sageDashStrike")) {
+      if (this.passives.has("sageDashStrike") || this.passives.has("cleanStrikes")) {
         this.dashStrikeReady = true;
       }
     }
 
     const slowMultiplier = this.slowed > 0 ? 0.58 : 1;
-    const speedBonus = 1 + this.statBonuses.moveSpeed;
+    const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.15 : 0;
+    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed;
     const speed = (this.dashing > 0 ? this.character.dashSpeed : this.character.speed) * speedBonus * slowMultiplier;
     this.dashing = Math.max(0, this.dashing - dt);
     this.x += move.x * speed * dt;
@@ -3749,8 +4303,11 @@ class Player {
 
   attack(combat, target) {
     const weapon = this.weapon;
-    const damage = this.attackDamage() * (this.dashStrikeReady ? 1.3 : 1);
+    this.basicAttackCount += 1;
+    const comboBonus = this.passives.has("combo") && this.basicAttackCount % 5 === 0 ? 1 : 0;
+    const damage = this.attackDamage() * (this.dashStrikeReady ? 1.3 : 1) * (1 + comboBonus);
     this.attackTimer = this.weaponCooldown();
+    const rangeSize = 1 + this.statBonuses.rangeSize;
 
     if (weapon.kind === "nuke") {
       this.fireNuke(combat);
@@ -3764,7 +4321,7 @@ class Player {
         x: this.x,
         y: this.y,
         angle: this.facing,
-        radius: weapon.range,
+        radius: weapon.range * rangeSize,
         arc: weapon.arc,
         damage,
         knockback: weapon.knockback,
@@ -3790,8 +4347,8 @@ class Player {
         x: this.x + Math.cos(this.facing) * 28,
         y: this.y + Math.sin(this.facing) * 28,
         angle: this.facing + offset + (Math.random() - 0.5) * spread * 0.2,
-        speed: weapon.projectileSpeed,
-        radius: weapon.rarity === "rare" ? 9 : 7,
+        speed: weapon.projectileSpeed * (1 + this.statBonuses.projectileSpeed),
+        radius: (weapon.rarity === "rare" ? 9 : 7) * rangeSize,
         damage,
         life: weapon.projectileLife,
         slow: weapon.slow ?? 0,
@@ -3955,11 +4512,15 @@ class Player {
         angle: angleTo(pet, target),
         speed: 680,
         radius: 6,
-        damage: 12 * (1 + this.statBonuses.attackDamage),
+        damage: (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage),
         life: 0.75,
+        slow: pet.slow ?? 0,
         color: pet.color
       });
-      pet.cooldown = 1.05;
+      if (pet.healPulse) {
+        this.heal(Math.max(1, this.maxHp * 0.01));
+      }
+      pet.cooldown = pet.cooldownMax ?? 1.05;
     }
   }
 
@@ -3975,7 +4536,12 @@ class Player {
     if (this.invulnerable > 0) {
       return false;
     }
-    this.hp = Math.max(0, this.hp - amount);
+    const damageTaken = amount * (1 - Math.min(0.6, this.statBonuses.damageReduction)) * (this.passives.has("poisonTrail") ? 1.1 : 1);
+    this.hp = Math.max(0, this.hp - damageTaken);
+    if (this.hp > 0 && this.passives.has("phoenixBlood") && this.phoenixBloodAvailable && this.hp / this.maxHp < 0.35) {
+      this.phoenixBloodAvailable = false;
+      this.heal(this.maxHp * 0.1);
+    }
     if (this.hp <= 0 && this.reviveAvailable) {
       this.reviveAvailable = false;
       this.hp = Math.ceil(this.maxHp * 0.45);
@@ -4028,7 +4594,18 @@ class Player {
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
-      abilityCooldown: 0
+      abilityCooldown: 0,
+      dashDistance: 0,
+      projectileSpeed: 0,
+      damageReduction: 0,
+      potionHeal: 0,
+      enemyCoins: 0,
+      healthPotDrops: 0,
+      regen: 0,
+      rangeSize: 0,
+      petDamage: 0,
+      lifesteal: 0,
+      stunChance: 0
     };
     this.abilityMods = {
       pullRadius: 0,
@@ -4048,9 +4625,14 @@ class Player {
     };
     this.pets = [];
     this.rewardHistory = [];
+    this.shopHistory = [];
     this.lastReward = null;
     this.reviveAvailable = false;
     this.dashStrikeReady = false;
+    this.phoenixBloodAvailable = false;
+    this.onGuardTimer = 0;
+    this.basicAttackCount = 0;
+    this.poisonTrailTimer = 0;
   }
 }
 
@@ -6122,7 +6704,8 @@ class Game {
       for (const enemy of defeatedEnemies) {
         this.dropEnemyEconomy(enemy);
         this.dropBossBlueprint(enemy);
-        if (Math.random() < 0.05) {
+        const potBonus = this.players.reduce((best, player) => Math.max(best, player.statBonuses.healthPotDrops), 0);
+        if (Math.random() < 0.05 * (1 + potBonus)) {
           this.loot.push(createHealthPotion(enemy.x, enemy.y, this.stage.isBoss ? 48 : 32));
         }
       }
@@ -6132,7 +6715,7 @@ class Game {
   dropEnemyEconomy(enemy) {
     const gold = enemyGoldValue(enemy, this.stage.number);
     for (const player of this.players) {
-      player.gold += gold;
+      player.gold += gold + player.statBonuses.enemyCoins;
       if (player.blueprints.weaponEvolution && Math.random() < 0.01) {
         this.spawnPlayerMaterialDrop("weapon", 1, player, enemy, player.playerIndex);
         this.combat.floatText(enemy.x, enemy.y - enemy.radius - 38, `${player.label} Weapon Ore dropped`, "#73a9ff");
@@ -6330,16 +6913,38 @@ class Game {
     const count = this.rewardChoices?.length ?? 3;
     if (canvas.width < 560 || canvas.height >= canvas.width) {
       const cardW = Math.min(canvas.width - 32, 330);
-      const cardH = 132;
       const gap = 10;
+      const maxH = Math.max(280, canvas.height - 142);
+      const cardH = clamp((maxH - gap * Math.max(0, count - 1)) / count, 92, 132);
       const totalH = cardH * count + gap * Math.max(0, count - 1);
-      const startY = Math.max(104, canvas.height / 2 - totalH / 2 + 28);
+      const startY = Math.max(92, canvas.height / 2 - totalH / 2 + 28);
       return Array.from({ length: count }, (_, index) => ({
         x: canvas.width / 2 - cardW / 2,
         y: startY + index * (cardH + gap),
         w: cardW,
         h: cardH
       }));
+    }
+    if (count > 3) {
+      const columns = Math.min(3, count);
+      const rows = Math.ceil(count / columns);
+      const gap = 14;
+      const cardW = Math.min(246, Math.max(176, (canvas.width - 120 - gap * (columns - 1)) / columns));
+      const cardH = rows > 1 ? 146 : 188;
+      const totalW = cardW * columns + gap * (columns - 1);
+      const totalH = cardH * rows + gap * (rows - 1);
+      const startX = canvas.width / 2 - totalW / 2;
+      const startY = canvas.height / 2 - totalH / 2 + 36;
+      return Array.from({ length: count }, (_, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        return {
+          x: startX + col * (cardW + gap),
+          y: startY + row * (cardH + gap),
+          w: cardW,
+          h: cardH
+        };
+      });
     }
     const cardW = Math.min(260, Math.max(188, (canvas.width - 120) / 3));
     const cardH = 188;
@@ -6388,6 +6993,16 @@ class Game {
       this.tryCompleteWeaponUpgrade(targetPlayer);
       this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
+      if (reward.opensChest) {
+        this.rewardChoices = rollRewardOptions(targetPlayer, 3, reward.opensChest);
+        this.rewardChest = {
+          type: "purchasedChest",
+          rarity: reward.opensChest,
+          name: reward.name
+        };
+        this.rewardPicker = targetPlayer;
+        return;
+      }
       if (this.rewardChest.stock.length === 0) {
         this.combat.floatText(targetPlayer.x, targetPlayer.y - 84, "Shop sold out", "#afa89e");
         this.rewardChoices = null;
@@ -6438,7 +7053,7 @@ class Game {
 
       if (target.type === "shop") {
         if (!target.stock) {
-          target.stock = rollShopOptions(player, 3);
+          target.stock = rollShopOptions(player, 6);
         }
         if (target.stock.length === 0) {
           this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
@@ -6466,7 +7081,7 @@ class Game {
       }
 
       if (target.type === "healthPotion") {
-        const healAmount = player.passives.has("potionBelt") ? Math.round(target.healAmount * 1.35) : target.healAmount;
+        const healAmount = Math.round(target.healAmount * (1 + player.statBonuses.potionHeal));
         const healed = player.heal(healAmount);
         this.combat.floatText(player.x, player.y - 54, healed > 0 ? `+${Math.round(healed)} HP` : "HP full", "#5ec28c");
         this.loot = this.loot.filter((item) => item.id !== target.id);
@@ -6538,6 +7153,7 @@ class Game {
       player.x = this.stage.room.width / 2 + (this.players.length === 2 ? (index === 0 ? -48 : 48) : 0);
       player.y = this.stage.room.height / 2;
       player.hp = Math.min(player.maxHp, player.hp + 18);
+      player.phoenixBloodAvailable = player.passives.has("phoenixBlood");
       player.game = this;
     });
     this.player = this.players[0];

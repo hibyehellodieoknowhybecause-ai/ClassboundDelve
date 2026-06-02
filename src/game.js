@@ -210,7 +210,8 @@ export class Game {
       for (const enemy of defeatedEnemies) {
         this.dropEnemyEconomy(enemy);
         this.dropBossBlueprint(enemy);
-        if (Math.random() < 0.05) {
+        const potBonus = this.players.reduce((best, player) => Math.max(best, player.statBonuses.healthPotDrops), 0);
+        if (Math.random() < 0.05 * (1 + potBonus)) {
           this.loot.push(createHealthPotion(enemy.x, enemy.y, this.stage.isBoss ? 48 : 32));
         }
       }
@@ -220,7 +221,7 @@ export class Game {
   dropEnemyEconomy(enemy) {
     const gold = enemyGoldValue(enemy, this.stage.number);
     for (const player of this.players) {
-      player.gold += gold;
+      player.gold += gold + player.statBonuses.enemyCoins;
       if (player.blueprints.weaponEvolution && Math.random() < 0.01) {
         this.spawnPlayerMaterialDrop("weapon", 1, player, enemy, player.playerIndex);
         this.combat.floatText(enemy.x, enemy.y - enemy.radius - 38, `${player.label} Weapon Ore dropped`, "#73a9ff");
@@ -418,16 +419,38 @@ export class Game {
     const count = this.rewardChoices?.length ?? 3;
     if (canvas.width < 560 || canvas.height >= canvas.width) {
       const cardW = Math.min(canvas.width - 32, 330);
-      const cardH = 132;
       const gap = 10;
+      const maxH = Math.max(280, canvas.height - 142);
+      const cardH = clamp((maxH - gap * Math.max(0, count - 1)) / count, 92, 132);
       const totalH = cardH * count + gap * Math.max(0, count - 1);
-      const startY = Math.max(104, canvas.height / 2 - totalH / 2 + 28);
+      const startY = Math.max(92, canvas.height / 2 - totalH / 2 + 28);
       return Array.from({ length: count }, (_, index) => ({
         x: canvas.width / 2 - cardW / 2,
         y: startY + index * (cardH + gap),
         w: cardW,
         h: cardH
       }));
+    }
+    if (count > 3) {
+      const columns = Math.min(3, count);
+      const rows = Math.ceil(count / columns);
+      const gap = 14;
+      const cardW = Math.min(246, Math.max(176, (canvas.width - 120 - gap * (columns - 1)) / columns));
+      const cardH = rows > 1 ? 146 : 188;
+      const totalW = cardW * columns + gap * (columns - 1);
+      const totalH = cardH * rows + gap * (rows - 1);
+      const startX = canvas.width / 2 - totalW / 2;
+      const startY = canvas.height / 2 - totalH / 2 + 36;
+      return Array.from({ length: count }, (_, index) => {
+        const col = index % columns;
+        const row = Math.floor(index / columns);
+        return {
+          x: startX + col * (cardW + gap),
+          y: startY + row * (cardH + gap),
+          w: cardW,
+          h: cardH
+        };
+      });
     }
     const cardW = Math.min(260, Math.max(188, (canvas.width - 120) / 3));
     const cardH = 188;
@@ -476,6 +499,16 @@ export class Game {
       this.tryCompleteWeaponUpgrade(targetPlayer);
       this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
+      if (reward.opensChest) {
+        this.rewardChoices = rollRewardOptions(targetPlayer, 3, reward.opensChest);
+        this.rewardChest = {
+          type: "purchasedChest",
+          rarity: reward.opensChest,
+          name: reward.name
+        };
+        this.rewardPicker = targetPlayer;
+        return;
+      }
       if (this.rewardChest.stock.length === 0) {
         this.combat.floatText(targetPlayer.x, targetPlayer.y - 84, "Shop sold out", "#afa89e");
         this.rewardChoices = null;
@@ -526,7 +559,7 @@ export class Game {
 
       if (target.type === "shop") {
         if (!target.stock) {
-          target.stock = rollShopOptions(player, 3);
+          target.stock = rollShopOptions(player, 6);
         }
         if (target.stock.length === 0) {
           this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
@@ -554,7 +587,7 @@ export class Game {
       }
 
       if (target.type === "healthPotion") {
-        const healAmount = player.passives.has("potionBelt") ? Math.round(target.healAmount * 1.35) : target.healAmount;
+        const healAmount = Math.round(target.healAmount * (1 + player.statBonuses.potionHeal));
         const healed = player.heal(healAmount);
         this.combat.floatText(player.x, player.y - 54, healed > 0 ? `+${Math.round(healed)} HP` : "HP full", "#5ec28c");
         this.loot = this.loot.filter((item) => item.id !== target.id);
@@ -626,6 +659,7 @@ export class Game {
       player.x = this.stage.room.width / 2 + (this.players.length === 2 ? (index === 0 ? -48 : 48) : 0);
       player.y = this.stage.room.height / 2;
       player.hp = Math.min(player.maxHp, player.hp + 18);
+      player.phoenixBloodAvailable = player.passives.has("phoenixBlood");
       player.game = this;
     });
     this.player = this.players[0];

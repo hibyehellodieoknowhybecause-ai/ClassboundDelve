@@ -84,7 +84,18 @@ export class Player {
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
-      abilityCooldown: 0
+      abilityCooldown: 0,
+      dashDistance: 0,
+      projectileSpeed: 0,
+      damageReduction: 0,
+      potionHeal: 0,
+      enemyCoins: 0,
+      healthPotDrops: 0,
+      regen: 0,
+      rangeSize: 0,
+      petDamage: 0,
+      lifesteal: 0,
+      stunChance: 0
     };
     this.abilityMods = {
       pullRadius: 0,
@@ -104,9 +115,14 @@ export class Player {
     };
     this.pets = [];
     this.rewardHistory = [];
+    this.shopHistory = [];
     this.lastReward = null;
     this.reviveAvailable = false;
     this.dashStrikeReady = false;
+    this.phoenixBloodAvailable = false;
+    this.onGuardTimer = 0;
+    this.basicAttackCount = 0;
+    this.poisonTrailTimer = 0;
   }
 
   get weapon() {
@@ -127,6 +143,14 @@ export class Player {
 
   hasReward(id) {
     return this.rewardHistory.includes(id);
+  }
+
+  rewardCount(id) {
+    return this.rewardHistory.filter((rewardId) => rewardId === id).length;
+  }
+
+  shopPurchaseCount(id) {
+    return this.shopHistory.filter((rewardId) => rewardId === id).length;
   }
 
   abilityValue(key) {
@@ -156,7 +180,8 @@ export class Player {
   }
 
   weaponCooldown() {
-    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.65, this.statBonuses.attackSpeed));
+    const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
+    return (this.weapon?.cooldown ?? 0.45) * (1 - Math.min(0.75, this.statBonuses.attackSpeed + lastStandSpeed));
   }
 
   attackDamageBonus() {
@@ -170,7 +195,8 @@ export class Player {
     if (this.weapon?.kind === "nuke") {
       return this.weapon.damage ?? 9999;
     }
-    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus());
+    const lastStandDamage = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.2 : 0;
+    return this.baseDamage * (1 + this.statBonuses.attackDamage + this.attackDamageBonus() + lastStandDamage);
   }
 
   update(dt, input, camera, room, combat) {
@@ -187,6 +213,31 @@ export class Player {
     }
     this.extraAbilityCooldown = Math.max(0, this.extraAbilityCooldown - dt);
     this.slowed = Math.max(0, this.slowed - dt);
+    if (this.statBonuses.regen > 0 && this.hp < this.maxHp) {
+      this.heal(this.maxHp * this.statBonuses.regen * dt);
+    }
+    if (this.passives.has("onGuard")) {
+      this.onGuardTimer -= dt;
+      if (this.onGuardTimer <= 0) {
+        this.invulnerable = Math.max(this.invulnerable, 1);
+        this.onGuardTimer = 5;
+      }
+    }
+    if (this.passives.has("poisonTrail") && this.isMoving) {
+      this.poisonTrailTimer -= dt;
+      if (this.poisonTrailTimer <= 0) {
+        combat.spawnIcePatch({
+          x: this.x,
+          y: this.y,
+          radius: 42,
+          slow: 0,
+          life: 1.6,
+          damagePerSecond: Math.max(1, this.maxHp * 0.01),
+          color: "#5ec28c"
+        });
+        this.poisonTrailTimer = 0.18;
+      }
+    }
 
     const worldMouse = {
       x: input.mouse.x / (camera.scale ?? 1) + camera.x,
@@ -205,16 +256,17 @@ export class Player {
     this.animationTime += dt;
 
     if (input.wasPressed(this.controls.dash) && this.dashTimer <= 0) {
-      this.dashing = 0.16;
-      this.invulnerable = 0.28;
+      this.dashing = 0.16 * (1 + this.statBonuses.dashDistance);
+      this.invulnerable = 0.28 + (this.passives.has("momentumGuard") ? 0.2 : 0);
       this.dashTimer = this.character.dashCooldown * (1 - Math.min(0.55, this.statBonuses.dashCooldown));
-      if (this.passives.has("sageDashStrike")) {
+      if (this.passives.has("sageDashStrike") || this.passives.has("cleanStrikes")) {
         this.dashStrikeReady = true;
       }
     }
 
     const slowMultiplier = this.slowed > 0 ? 0.58 : 1;
-    const speedBonus = 1 + this.statBonuses.moveSpeed;
+    const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.15 : 0;
+    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed;
     const speed = (this.dashing > 0 ? this.character.dashSpeed : this.character.speed) * speedBonus * slowMultiplier;
     this.dashing = Math.max(0, this.dashing - dt);
     this.x += move.x * speed * dt;
@@ -403,8 +455,11 @@ export class Player {
 
   attack(combat, target) {
     const weapon = this.weapon;
-    const damage = this.attackDamage() * (this.dashStrikeReady ? 1.3 : 1);
+    this.basicAttackCount += 1;
+    const comboBonus = this.passives.has("combo") && this.basicAttackCount % 5 === 0 ? 1 : 0;
+    const damage = this.attackDamage() * (this.dashStrikeReady ? 1.3 : 1) * (1 + comboBonus);
     this.attackTimer = this.weaponCooldown();
+    const rangeSize = 1 + this.statBonuses.rangeSize;
 
     if (weapon.kind === "nuke") {
       this.fireNuke(combat);
@@ -418,7 +473,7 @@ export class Player {
         x: this.x,
         y: this.y,
         angle: this.facing,
-        radius: weapon.range,
+        radius: weapon.range * rangeSize,
         arc: weapon.arc,
         damage,
         knockback: weapon.knockback,
@@ -444,8 +499,8 @@ export class Player {
         x: this.x + Math.cos(this.facing) * 28,
         y: this.y + Math.sin(this.facing) * 28,
         angle: this.facing + offset + (Math.random() - 0.5) * spread * 0.2,
-        speed: weapon.projectileSpeed,
-        radius: weapon.rarity === "rare" ? 9 : 7,
+        speed: weapon.projectileSpeed * (1 + this.statBonuses.projectileSpeed),
+        radius: (weapon.rarity === "rare" ? 9 : 7) * rangeSize,
         damage,
         life: weapon.projectileLife,
         slow: weapon.slow ?? 0,
@@ -609,11 +664,15 @@ export class Player {
         angle: angleTo(pet, target),
         speed: 680,
         radius: 6,
-        damage: 12 * (1 + this.statBonuses.attackDamage),
+        damage: (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage),
         life: 0.75,
+        slow: pet.slow ?? 0,
         color: pet.color
       });
-      pet.cooldown = 1.05;
+      if (pet.healPulse) {
+        this.heal(Math.max(1, this.maxHp * 0.01));
+      }
+      pet.cooldown = pet.cooldownMax ?? 1.05;
     }
   }
 
@@ -629,7 +688,12 @@ export class Player {
     if (this.invulnerable > 0) {
       return false;
     }
-    this.hp = Math.max(0, this.hp - amount);
+    const damageTaken = amount * (1 - Math.min(0.6, this.statBonuses.damageReduction)) * (this.passives.has("poisonTrail") ? 1.1 : 1);
+    this.hp = Math.max(0, this.hp - damageTaken);
+    if (this.hp > 0 && this.passives.has("phoenixBlood") && this.phoenixBloodAvailable && this.hp / this.maxHp < 0.35) {
+      this.phoenixBloodAvailable = false;
+      this.heal(this.maxHp * 0.1);
+    }
     if (this.hp <= 0 && this.reviveAvailable) {
       this.reviveAvailable = false;
       this.hp = Math.ceil(this.maxHp * 0.45);
@@ -682,7 +746,18 @@ export class Player {
       attackSpeed: 0,
       moveSpeed: 0,
       dashCooldown: 0,
-      abilityCooldown: 0
+      abilityCooldown: 0,
+      dashDistance: 0,
+      projectileSpeed: 0,
+      damageReduction: 0,
+      potionHeal: 0,
+      enemyCoins: 0,
+      healthPotDrops: 0,
+      regen: 0,
+      rangeSize: 0,
+      petDamage: 0,
+      lifesteal: 0,
+      stunChance: 0
     };
     this.abilityMods = {
       pullRadius: 0,
@@ -702,8 +777,13 @@ export class Player {
     };
     this.pets = [];
     this.rewardHistory = [];
+    this.shopHistory = [];
     this.lastReward = null;
     this.reviveAvailable = false;
     this.dashStrikeReady = false;
+    this.phoenixBloodAvailable = false;
+    this.onGuardTimer = 0;
+    this.basicAttackCount = 0;
+    this.poisonTrailTimer = 0;
   }
 }

@@ -1,4 +1,4 @@
-const CACHE_NAME = "classbound-delve-v6";
+const CACHE_NAME = "classbound-delve-v7";
 const CORE_ASSETS = [
   "./",
   "./index.html",
