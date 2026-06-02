@@ -123,6 +123,14 @@ export class Player {
     this.onGuardTimer = 0;
     this.basicAttackCount = 0;
     this.poisonTrailTimer = 0;
+    this.petSpeedBoost = 0;
+    this.petDamageBoost = 0;
+    this.bodyguardState = {
+      active: false,
+      timer: 0,
+      cooldown: 0
+    };
+    this.petTaunts = [];
   }
 
   get weapon() {
@@ -213,6 +221,8 @@ export class Player {
     }
     this.extraAbilityCooldown = Math.max(0, this.extraAbilityCooldown - dt);
     this.slowed = Math.max(0, this.slowed - dt);
+    this.petSpeedBoost = Math.max(0, this.petSpeedBoost - dt);
+    this.petDamageBoost = Math.max(0, this.petDamageBoost - dt);
     if (this.statBonuses.regen > 0 && this.hp < this.maxHp) {
       this.heal(this.maxHp * this.statBonuses.regen * dt);
     }
@@ -266,7 +276,7 @@ export class Player {
 
     const slowMultiplier = this.slowed > 0 ? 0.58 : 1;
     const lastStandSpeed = this.passives.has("lastStand") && this.hp / this.maxHp < 0.3 ? 0.15 : 0;
-    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed;
+    const speedBonus = 1 + this.statBonuses.moveSpeed + lastStandSpeed + (this.petSpeedBoost > 0 ? 0.2 : 0);
     const speed = (this.dashing > 0 ? this.character.dashSpeed : this.character.speed) * speedBonus * slowMultiplier;
     this.dashing = Math.max(0, this.dashing - dt);
     this.x += move.x * speed * dt;
@@ -305,6 +315,7 @@ export class Player {
       this.updateAbility(dt, combat);
     }
 
+    this.updateBodyguards(dt, combat);
     this.updatePets(dt, combat);
   }
 
@@ -634,6 +645,11 @@ export class Player {
   }
 
   updatePets(dt, combat) {
+    this.petTaunts = this.petTaunts.filter((taunt) => taunt.timer > 0);
+    for (const taunt of this.petTaunts) {
+      taunt.timer -= dt;
+    }
+
     if (!this.game || this.pets.length === 0) {
       return;
     }
@@ -644,6 +660,29 @@ export class Player {
       pet.x = this.x + Math.cos(pet.angle + i * 2.1) * 48;
       pet.y = this.y + Math.sin(pet.angle + i * 2.1) * 34;
       pet.cooldown = Math.max(0, pet.cooldown - dt);
+      if (pet.speedPulse) {
+        pet.speedPulseCooldown = Math.max(0, (pet.speedPulseCooldown ?? 0) - dt);
+        if (pet.speedPulseCooldown <= 0) {
+          this.petSpeedBoost = Math.max(this.petSpeedBoost, 2.5);
+          combat.floatText(this.x, this.y - 72, "Bird speed", pet.color);
+          pet.speedPulseCooldown = 7;
+        }
+      }
+      if (pet.tauntCooldown !== undefined) {
+        pet.tauntCooldown = Math.max(0, pet.tauntCooldown - dt);
+        if (pet.tauntCooldown <= 0) {
+          this.petTaunts.push({
+            x: pet.x,
+            y: pet.y,
+            radius: 90,
+            timer: 3,
+            hp: 1,
+            takeDamage: () => false
+          });
+          combat.floatText(pet.x, pet.y - 24, "Taunt", pet.color);
+          pet.tauntCooldown = 8;
+        }
+      }
 
       if (pet.cooldown > 0) {
         continue;
@@ -664,16 +703,71 @@ export class Player {
         angle: angleTo(pet, target),
         speed: 680,
         radius: 6,
-        damage: (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage),
+        damage: this.petDamage(pet),
         life: 0.75,
         slow: pet.slow ?? 0,
+        poison: pet.poison,
+        bleed: pet.bleed,
         color: pet.color
       });
       if (pet.healPulse) {
         this.heal(Math.max(1, this.maxHp * 0.01));
       }
+      if (pet.buffPulse) {
+        this.petDamageBoost = Math.max(this.petDamageBoost, 2.5);
+        combat.floatText(this.x, this.y - 92, "Fairy buff", pet.color);
+      }
       pet.cooldown = pet.cooldownMax ?? 1.05;
     }
+  }
+
+  petDamage(pet) {
+    if (pet.bodyguard) {
+      return this.attackDamage() * (pet.damageRatio ?? 0.3) * (1 + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.2 : 0));
+    }
+    return (pet.damage ?? 12) * (1 + this.statBonuses.attackDamage + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.2 : 0));
+  }
+
+  updateBodyguards(dt, combat) {
+    if (!this.passives.has("bodyguards")) {
+      return;
+    }
+
+    if (this.bodyguardState.active) {
+      this.bodyguardState.timer -= dt;
+      if (this.bodyguardState.timer <= 0) {
+        this.pets = this.pets.filter((pet) => !pet.bodyguard);
+        this.bodyguardState.active = false;
+        this.bodyguardState.cooldown = 10;
+        combat.floatText(this.x, this.y - 76, "Bodyguards fade", "#afa89e");
+      }
+      return;
+    }
+
+    this.bodyguardState.cooldown = Math.max(0, this.bodyguardState.cooldown - dt);
+    if (this.bodyguardState.cooldown > 0) {
+      return;
+    }
+
+    const upgrades = this.rewardCount("bodyguards2");
+    const count = 2 + upgrades * 2;
+    const damageRatio = 0.3 + upgrades * 0.1;
+    this.pets = this.pets.filter((pet) => !pet.bodyguard);
+    for (let i = 0; i < count; i += 1) {
+      this.pets.push({
+        id: `bodyguard-${i}`,
+        name: "Bodyguard",
+        bodyguard: true,
+        angle: (Math.PI * 2 * i) / count,
+        cooldown: 0.2 + i * 0.08,
+        cooldownMax: 0.95,
+        color: "#afa89e",
+        damageRatio
+      });
+    }
+    this.bodyguardState.active = true;
+    this.bodyguardState.timer = 10;
+    combat.floatText(this.x, this.y - 76, "Bodyguards summoned", "#afa89e");
   }
 
   takeDamage(amount) {
@@ -785,5 +879,13 @@ export class Player {
     this.onGuardTimer = 0;
     this.basicAttackCount = 0;
     this.poisonTrailTimer = 0;
+    this.petSpeedBoost = 0;
+    this.petDamageBoost = 0;
+    this.bodyguardState = {
+      active: false,
+      timer: 0,
+      cooldown: 0
+    };
+    this.petTaunts = [];
   }
 }

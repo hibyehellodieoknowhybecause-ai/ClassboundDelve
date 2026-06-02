@@ -228,11 +228,16 @@ export function updateEnemies(enemies, players, dt, room, combat) {
   if (livePlayers.length === 0) {
     return;
   }
+  const targets = [
+    ...livePlayers,
+    ...livePlayers.flatMap((player) => player.petTaunts ?? []).filter((taunt) => taunt.timer > 0)
+  ];
 
   for (const enemy of enemies) {
-    const player = nearestPlayer(enemy, livePlayers);
+    const player = nearestPlayer(enemy, targets);
     tickEnemyTimers(enemy, dt);
     updateEnemyRegeneration(enemy, dt);
+    updateEnemyStatuses(enemy, dt, combat);
     updatePerception(enemy, player);
 
     if (enemy.frozen <= 0) {
@@ -341,6 +346,27 @@ function updateEnemyRegeneration(enemy, dt) {
 
   enemy.regenerating = true;
   enemy.hp = Math.min(enemy.maxHp, enemy.hp + enemy.maxHp * ENEMY_REGEN_RATE * dt);
+}
+
+function updateEnemyStatuses(enemy, dt, combat) {
+  if (enemy.poisoned?.timer > 0) {
+    enemy.poisoned.timer -= dt;
+    enemy.hp -= enemy.maxHp * enemy.poisoned.rate * dt;
+    enemy.timeSinceHit = 0;
+    enemy.regenerating = false;
+    if (Math.random() < 0.02) {
+      combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Poison", "#5ec28c");
+    }
+  }
+  if (enemy.bleeding?.timer > 0) {
+    enemy.bleeding.timer -= dt;
+    enemy.hp -= enemy.maxHp * enemy.bleeding.rate * dt;
+    enemy.timeSinceHit = 0;
+    enemy.regenerating = false;
+    if (Math.random() < 0.02) {
+      combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Bleed", "#d95757");
+    }
+  }
 }
 
 function updatePerception(enemy, player) {

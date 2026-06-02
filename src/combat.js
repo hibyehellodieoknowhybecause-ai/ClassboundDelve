@@ -100,6 +100,18 @@ export class CombatSystem {
           if (projectile.slow) {
             enemy.slowed = Math.max(enemy.slowed ?? 0, projectile.slow);
           }
+          if (projectile.poison) {
+            enemy.poisoned = {
+              timer: projectile.poison.duration,
+              rate: projectile.poison.rate
+            };
+          }
+          if (projectile.bleed) {
+            enemy.bleeding = {
+              timer: projectile.bleed.duration,
+              rate: projectile.bleed.rate
+            };
+          }
           this.floatText(enemy.x, enemy.y - enemy.radius, Math.round(projectile.damage).toString(), projectile.color);
           projectile.life = 0;
           this.spawnProjectileEndPatch(projectile);

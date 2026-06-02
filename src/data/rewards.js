@@ -82,12 +82,12 @@ function addEpicEgg(player) {
   }
   const roll = Math.random();
   const pet =
-    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f6f1e8", damage: 10, cooldownMax: 1.35, healPulse: true } :
-    roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#5ec28c", damage: 15, cooldownMax: 0.95, slow: 0.4 } :
-    roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#f2b85b", damage: 14, cooldownMax: 0.85, speedPulse: true } :
-    roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#73a9ff", damage: 13, cooldownMax: 1.0, slow: 1.0 } :
-    roll < 0.81 ? { id: "epicTiger", name: "Epic Tiger", color: "#d95757", damage: 18, cooldownMax: 1.1 } :
-    { id: "epicTortoise", name: "Epic Tortoise", color: "#8d5a38", damage: 12, cooldownMax: 1.25 };
+    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f6f1e8", damage: 10, cooldownMax: 1.35, healPulse: true, buffPulse: true } :
+    roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#5ec28c", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } :
+    roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#f2b85b", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } :
+    roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#73a9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } :
+    roll < 0.81 ? { id: "epicTiger", name: "Epic Tiger", color: "#d95757", damage: 18, cooldownMax: 1.1, bleed: { duration: 3, rate: 0.018 } } :
+    { id: "epicTortoise", name: "Epic Tortoise", color: "#8d5a38", damage: 12, cooldownMax: 1.25, tauntCooldown: 0 };
   if (pet.id === "mythicalFairy") {
     player.passives.add("fairyHatched");
   }
@@ -492,8 +492,7 @@ const rewardPool = [
     description: "Summon 2 bodyguards as pet allies.",
     apply(player) {
       player.passives.add("bodyguards");
-      addPet(player, { id: "bodyguardA", name: "Bodyguard", color: "#afa89e", damage: 9, cooldownMax: 1.1 });
-      addPet(player, { id: "bodyguardB", name: "Bodyguard", color: "#afa89e", damage: 9, cooldownMax: 1.1 });
+      player.bodyguardState.cooldown = 0;
     }
   },
   {
@@ -506,8 +505,7 @@ const rewardPool = [
     description: "Add 2 more bodyguards and improve pet damage.",
     apply(player) {
       player.statBonuses.petDamage += 0.1;
-      addPet(player, { id: `bodyguard-${player.rewardCount("bodyguards2")}-a`, name: "Bodyguard", color: "#afa89e", damage: 10, cooldownMax: 1.05 });
-      addPet(player, { id: `bodyguard-${player.rewardCount("bodyguards2")}-b`, name: "Bodyguard", color: "#afa89e", damage: 10, cooldownMax: 1.05 });
+      player.bodyguardState.cooldown = Math.min(player.bodyguardState.cooldown, 1);
     }
   },
   {
