@@ -176,7 +176,7 @@ const rewardPool = [
   {
     id: "phoenixBlood",
     type: "Passive",
-    name: "Phoenix Blood",
+    name: "Second Heart",
     rarity: "uncommon",
     maxCount: 1,
     description: "Once per room below 35% HP, heal 10% max HP.",
@@ -276,7 +276,7 @@ const rewardPool = [
   {
     id: "secondHeart",
     type: "Passive",
-    name: "Second Heart",
+    name: "Phoenix Blood",
     rarity: "rare",
     maxCount: 1,
     description: "Once per run, lethal damage revives you at 45% HP.",
