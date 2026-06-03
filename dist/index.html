@@ -2759,6 +2759,18 @@ const spriteSheets = {
       liveStream: { row: 5, frames: 8, fps: 14 },
       hurt: { row: 6, frames: 2, fps: 6 }
     }
+  },
+  bossElon: {
+    src: "./assets/sprites/elon_boss.png",
+    frameWidth: 97,
+    frameHeight: 220,
+    drawWidth: 86,
+    drawHeight: 196,
+    animations: {
+      idle: { row: 0, frames: 1, fps: 1 },
+      walk: { row: 0, frames: 1, fps: 1 },
+      attack: { row: 0, frames: 1, fps: 1 }
+    }
   }
 };
 
@@ -3760,7 +3772,7 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
 
   if (enemy.state === "windup") {
     if (enemy.stateTimer <= 0) {
-      finishWindup(enemy, player, combat, enemies);
+      finishWindup(enemy, player, combat, enemies, room);
     }
     return;
   }
@@ -4050,69 +4062,87 @@ function startWindup(enemy, nextAction, duration, combat, label) {
   }
 }
 
-function finishWindup(enemy, player, combat, enemies = []) {
+function finishWindup(enemy, player, combat, enemies = [], room = null) {
   if (enemy.nextAction === "xPost") {
     const direction = player.x >= enemy.x ? 0 : Math.PI;
-    for (let i = -1; i <= 1; i += 1) {
+    for (let i = -2; i <= 2; i += 1) {
       combat.spawnEnemyProjectile({
         x: enemy.x + Math.cos(direction) * 40,
-        y: enemy.y + i * 24,
+        y: enemy.y + i * 22,
         angle: direction,
-        speed: 660,
-        damage: consumeMarketDamage(enemy, enemy.damage * 0.52),
-        radius: 13,
-        color: "#43d9ff",
-        life: 1.25,
+        speed: 760 + Math.abs(i) * 35,
+        damage: consumeMarketDamage(enemy, enemy.damage * 0.46),
+        radius: i === 0 ? 16 : 13,
+        color: i === 0 ? "#d8f2ff" : "#43d9ff",
+        life: 1.6,
         kind: "xPost",
         labelOnHit: "X-Post"
       });
     }
-    enemy.specialCooldown = 1.05;
+    enemy.specialCooldown = 0.82;
     enemy.state = "chase";
     return;
   }
 
   if (enemy.nextAction === "autopilot") {
-    const lanes = 6;
-    const laneHeight = 155;
-    const top = Math.max(130, player.y - laneHeight * 2.5);
-    for (let i = 0; i < lanes; i += 1) {
-      if (i % 2 !== enemy.phase % 2) {
+    const arena = room ?? { width: 2040, height: 1280, margin: 90 };
+    const laneSpacing = 150;
+    const startY = arena.margin + 82;
+    const endY = arena.height - arena.margin - 82;
+    let laneIndex = 0;
+    for (let y = startY; y <= endY; y += laneSpacing) {
+      if (laneIndex % 2 !== enemy.phase % 2) {
+        laneIndex += 1;
         continue;
       }
-      const fromLeft = i % 4 !== 1;
+      const fromLeft = laneIndex % 4 !== 1;
       combat.spawnEnemyProjectile({
-        x: fromLeft ? 120 : 1960,
-        y: top + laneHeight * i,
+        x: fromLeft ? arena.margin - 90 : arena.width - arena.margin + 90,
+        y,
         angle: fromLeft ? 0 : Math.PI,
-        speed: 1120,
-        damage: consumeMarketDamage(enemy, enemy.damage * 0.9),
-        radius: 28,
+        speed: 1240,
+        damage: consumeMarketDamage(enemy, enemy.damage * 0.94),
+        radius: 32,
         color: "#cfd8df",
-        life: 1.9,
+        life: (arena.width - arena.margin * 2 + 240) / 1240,
         kind: "tesla",
         labelOnHit: "Traffic"
       });
+      laneIndex += 1;
     }
-    enemy.specialCooldown = 2.4;
+    enemy.specialCooldown = 2.15;
     enemy.state = "chase";
     return;
   }
 
   if (enemy.nextAction === "flamethrower") {
+    const angle = angleTo(enemy, player);
     enemy.elonHazards.push({
       id: `flame-${Math.random().toString(16).slice(2)}`,
       type: "flameCone",
       x: enemy.x,
       y: enemy.y,
-      angle: angleTo(enemy, player),
-      radius: 285,
-      arc: 0.78,
-      timer: 1.45,
-      total: 1.45,
-      damagePerSecond: enemy.damage * 0.72
+      angle,
+      radius: 380,
+      arc: 1.02,
+      timer: 1.75,
+      total: 1.75,
+      damagePerSecond: enemy.damage * 0.88
     });
-    enemy.specialCooldown = 1.85;
+    for (let i = 1; i <= 5; i += 1) {
+      const spread = (i % 2 === 0 ? -0.22 : 0.22) * Math.ceil(i / 2);
+      enemy.elonHazards.push({
+        id: `flame-patch-${Math.random().toString(16).slice(2)}`,
+        type: "flamePatch",
+        x: enemy.x + Math.cos(angle + spread) * (92 + i * 48),
+        y: enemy.y + Math.sin(angle + spread) * (92 + i * 48),
+        radius: 58,
+        timer: 3.1,
+        total: 3.1,
+        damagePerSecond: enemy.damage * 0.32
+      });
+    }
+    enemy.specialCooldown = 1.7;
     enemy.state = "chase";
     return;
   }
@@ -4130,13 +4160,13 @@ function finishWindup(enemy, player, combat, enemies = []) {
       type: "rocket",
       x: player.x,
       y: player.y,
-      timer: 1.9,
-      total: 1.9,
+      timer: 2.45,
+      total: 2.45,
       shockDone: false,
       plumeTick: 0
     });
-    enemy.podTimer = 1.35;
-    enemy.specialCooldown = 3.7;
+    enemy.podTimer = 1.65;
+    enemy.specialCooldown = 3.35;
     enemy.state = "chase";
     combat.screenShake = Math.max(combat.screenShake, 16);
     return;
@@ -4442,10 +4472,10 @@ function spawnDoge(enemy, player) {
   enemy.elonDoge = {
     x: enemy.x,
     y: Math.max(130, enemy.y - 220),
-    vx: Math.cos(angle) * 520,
-    vy: Math.sin(angle) * 520,
-    radius: 42,
-    timer: 5.2,
+    vx: Math.cos(angle) * 640,
+    vy: Math.sin(angle) * 640,
+    radius: 46,
+    timer: 6.4,
     hitCooldown: 0
   };
 }
@@ -4462,15 +4492,17 @@ function updateElonDoge(enemy, player, dt, combat, room) {
   if (doge.x < room.margin + doge.radius || doge.x > room.width - room.margin - doge.radius) {
     doge.vx *= -1;
     doge.x = clamp(doge.x, room.margin + doge.radius, room.width - room.margin - doge.radius);
+    scatterElonCoins(enemy, doge.x, doge.y, 3);
   }
   if (doge.y < room.margin + doge.radius || doge.y > room.height - room.margin - doge.radius) {
     doge.vy *= -1;
     doge.y = clamp(doge.y, room.margin + doge.radius, room.height - room.margin - doge.radius);
+    scatterElonCoins(enemy, doge.x, doge.y, 3);
   }
   if (doge.hitCooldown <= 0 && distance(doge, player) <= doge.radius + player.radius) {
-    const hit = player.takeDamage(enemy.damage * 0.7);
+    const hit = player.takeDamage(enemy.damage * 0.82);
     doge.hitCooldown = 0.55;
-    scatterElonCoins(enemy, doge.x, doge.y);
+    scatterElonCoins(enemy, doge.x, doge.y, 9);
     if (hit) {
       combat.floatText(player.x, player.y - 46, "Doge!", "#f2b85b");
       combat.screenShake = Math.max(combat.screenShake, 8);
@@ -4481,14 +4513,15 @@ function updateElonDoge(enemy, player, dt, combat, room) {
   }
 }
 
-function scatterElonCoins(enemy, x, y) {
-  for (let i = 0; i < 7; i += 1) {
-    const angle = (Math.PI * 2 * i) / 7 + randomRange(-0.18, 0.18);
+function scatterElonCoins(enemy, x, y, count = 7) {
+  for (let i = 0; i < count; i += 1) {
+    const angle = (Math.PI * 2 * i) / count + randomRange(-0.18, 0.18);
     enemy.elonCoins.push({
       x: x + Math.cos(angle) * randomRange(28, 88),
       y: y + Math.sin(angle) * randomRange(28, 88),
       radius: 14,
       timer: 5.8,
+      magnetDelay: 0.7,
       bob: Math.random() * Math.PI * 2
     });
   }
@@ -4497,10 +4530,16 @@ function scatterElonCoins(enemy, x, y) {
 function updateElonCoins(enemy, dt, combat) {
   for (const coin of enemy.elonCoins) {
     coin.timer -= dt;
+    coin.magnetDelay = Math.max(0, (coin.magnetDelay ?? 0) - dt);
     coin.bob += dt * 5;
+    if (coin.magnetDelay <= 0) {
+      const dir = normalize(enemy.x - coin.x, enemy.y - coin.y);
+      coin.x += dir.x * 230 * dt;
+      coin.y += dir.y * 230 * dt;
+    }
     if (distance(enemy, coin) <= enemy.radius + coin.radius + 16) {
       coin.timer = 0;
-      enemy.elonSpeedBuff = Math.max(enemy.elonSpeedBuff ?? 0, 2.4);
+      enemy.elonSpeedBuff = Math.max(enemy.elonSpeedBuff ?? 0, 3.1);
       combat.floatText(enemy.x, enemy.y - enemy.radius - 32, "Coin rush", "#f2b85b");
     }
   }
@@ -4519,12 +4558,21 @@ function updateElonHazards(enemy, player, dt, combat) {
       }
       continue;
     }
+    if (hazard.type === "flamePatch") {
+      if (distance(hazard, player) <= hazard.radius + player.radius) {
+        const hit = player.takeDamage(hazard.damagePerSecond * dt);
+        if (hit && Math.random() < 0.06) {
+          combat.floatText(player.x, player.y - 46, "Scorched", "#ef7d57");
+        }
+      }
+      continue;
+    }
     if (hazard.type === "rocket") {
       const elapsed = hazard.total - hazard.timer;
-      if (!hazard.shockDone && elapsed >= 0.6) {
+      if (!hazard.shockDone && elapsed >= 0.72) {
         hazard.shockDone = true;
-        if (distance(hazard, player) <= 720 + player.radius) {
-          const hit = player.takeDamage(enemy.damage * 1.05);
+        if (distance(hazard, player) <= 940 + player.radius) {
+          const hit = player.takeDamage(enemy.damage * 1.16);
           if (hit) {
             combat.floatText(player.x, player.y - 46, "Shockwave", "#f2b85b");
           }
@@ -4532,10 +4580,10 @@ function updateElonHazards(enemy, player, dt, combat) {
         combat.screenShake = Math.max(combat.screenShake, 24);
       }
       hazard.plumeTick -= dt;
-      if (elapsed >= 0.85 && hazard.plumeTick <= 0) {
-        hazard.plumeTick = 0.18;
-        if (distance(hazard, player) <= 210 + player.radius) {
-          const hit = player.takeDamage(enemy.damage * 0.34);
+      if (elapsed >= 0.95 && hazard.plumeTick <= 0) {
+        hazard.plumeTick = 0.14;
+        if (distance(hazard, player) <= 265 + player.radius) {
+          const hit = player.takeDamage(enemy.damage * 0.4);
           if (hit) {
             combat.floatText(player.x, player.y - 46, "Rocket fire", "#ef7d57");
           }
@@ -6310,22 +6358,45 @@ class Renderer {
         continue;
       }
 
+      if (hazard.type === "flamePatch") {
+        const alpha = Math.max(0.12, Math.min(0.42, hazard.timer / hazard.total));
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#ef7d57";
+        ctx.strokeStyle = "#f2b85b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = "#f2b85b";
+        for (let i = 0; i < 5; i += 1) {
+          const angle = (Math.PI * 2 * i) / 5 + performance.now() / 900;
+          ctx.beginPath();
+          ctx.arc(hazard.x + Math.cos(angle) * hazard.radius * 0.48, hazard.y + Math.sin(angle) * hazard.radius * 0.38, 9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
+
       if (hazard.type === "rocket") {
         const elapsed = hazard.total - hazard.timer;
         ctx.save();
         ctx.translate(hazard.x, hazard.y);
-        if (elapsed < 0.6) {
+        if (elapsed < 0.72) {
           ctx.strokeStyle = "#f2b85b";
           ctx.lineWidth = 5;
           ctx.beginPath();
-          ctx.arc(0, 0, 190 + Math.sin(performance.now() / 55) * 10, 0, Math.PI * 2);
+          ctx.arc(0, 0, 230 + Math.sin(performance.now() / 55) * 12, 0, Math.PI * 2);
           ctx.stroke();
           ctx.fillStyle = "#f2b85b";
           ctx.font = "900 16px ui-sans-serif, system-ui";
           ctx.textAlign = "center";
           ctx.fillText("STARSHIP", 0, -210);
         } else {
-          const shock = Math.min(720, (elapsed - 0.6) * 1200);
+          const shock = Math.min(940, (elapsed - 0.72) * 1300);
           ctx.strokeStyle = "rgba(242, 184, 91, 0.55)";
           ctx.lineWidth = 8;
           ctx.beginPath();
@@ -6333,7 +6404,7 @@ class Renderer {
           ctx.stroke();
           ctx.fillStyle = "rgba(239, 125, 87, 0.42)";
           ctx.beginPath();
-          ctx.arc(0, 0, 210, 0, Math.PI * 2);
+          ctx.arc(0, 0, 265, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = "#cfd8df";
           ctx.fillRect(-18, -190, 36, 170);
@@ -6436,10 +6507,11 @@ class Renderer {
 
   drawEnemyStatus(ctx, enemy) {
     const barWidth = enemy.radius * 2.2;
+    const statusY = enemy.bossKind === "elon" ? enemy.y - 118 : enemy.y - enemy.radius - 16;
     ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-    ctx.fillRect(enemy.x - barWidth / 2, enemy.y - enemy.radius - 16, barWidth, 6);
+    ctx.fillRect(enemy.x - barWidth / 2, statusY, barWidth, 6);
     ctx.fillStyle = enemy.type === "boss" ? "#a747d9" : "#d95757";
-    ctx.fillRect(enemy.x - barWidth / 2, enemy.y - enemy.radius - 16, barWidth * Math.max(0, enemy.hp / enemy.maxHp), 6);
+    ctx.fillRect(enemy.x - barWidth / 2, statusY, barWidth * Math.max(0, enemy.hp / enemy.maxHp), 6);
 
     if (enemy.specialCooldown < 0.25 && (enemy.type === "brute" || enemy.type === "ranger" || enemy.type === "boss")) {
       ctx.strokeStyle = "#f2b85b";
@@ -6476,13 +6548,13 @@ class Renderer {
       const color = state === "green" ? "#5ec28c" : state === "red" ? "#d95757" : "#afa89e";
       ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
       ctx.beginPath();
-      this.drawRoundRect(ctx, enemy.x - 42, enemy.y - enemy.radius - 36, 84, 18, 5);
+      this.drawRoundRect(ctx, enemy.x - 42, statusY - 24, 84, 18, 5);
       ctx.fill();
       ctx.fillStyle = color;
       ctx.font = "900 12px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
       const ticker = state === "green" ? "X +15%" : state === "red" ? "X DEF" : "X --";
-      ctx.fillText(ticker, enemy.x, enemy.y - enemy.radius - 23);
+      ctx.fillText(ticker, enemy.x, statusY - 11);
       ctx.textAlign = "start";
       if (enemy.podTimer > 0) {
         ctx.strokeStyle = "#d8f2ff";
@@ -6509,7 +6581,7 @@ class Renderer {
   }
 
   drawEnemySprite(ctx, enemy) {
-    const spriteId = enemy.bossKind === "broadcaster" ? "bossBroadcaster" : null;
+    const spriteId = enemy.bossKind === "broadcaster" ? "bossBroadcaster" : enemy.bossKind === "elon" ? "bossElon" : null;
     if (!spriteId) {
       return false;
     }

@@ -96,11 +96,12 @@ http://localhost:4173
   - Supporters spawn passively during the fight.
 - Stage 10 second boss:
   - Elon Musk, Market Volatility.
+  - Uses a dedicated pasted-image boss sprite.
   - X-Post Projectile fires neon-blue X logos horizontally across the arena.
-  - Autopilot Stampede sends Tesla lane traffic across every other horizontal lane.
-  - Not-A-Flamethrower creates a medium-range cone of fire that burns the floor.
-  - To The Moon drops a bouncing Doge that scatters coins on hit; collecting coins speeds Elon up.
-  - Starship Launch Initiative creates a glass-pod warning, a rocket shockwave, and a rocket-fire plume.
+  - Autopilot Stampede sends Tesla traffic across spaced horizontal lanes over the whole map.
+  - Not-A-Flamethrower creates a wider fire cone and leaves burning floor patches.
+  - To The Moon drops a faster bouncing Doge that scatters magnetized coins; collecting coins speeds Elon up.
+  - Starship Launch Initiative creates a glass-pod warning, a larger rocket shockwave, and a rocket-fire plume.
   - Market Volatility rolls a ticker before abilities: green boosts the next attack by 15%, red temporarily reduces incoming damage.
 - The swordsman is invincible while Whirlwind Smash is active.
 - Archer's Giant Net auto-aims at the nearest target when used.

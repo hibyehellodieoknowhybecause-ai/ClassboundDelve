@@ -338,22 +338,45 @@ export class Renderer {
         continue;
       }
 
+      if (hazard.type === "flamePatch") {
+        const alpha = Math.max(0.12, Math.min(0.42, hazard.timer / hazard.total));
+        ctx.save();
+        ctx.globalAlpha = alpha;
+        ctx.fillStyle = "#ef7d57";
+        ctx.strokeStyle = "#f2b85b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(hazard.x, hazard.y, hazard.radius, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.stroke();
+        ctx.globalAlpha = alpha * 0.9;
+        ctx.fillStyle = "#f2b85b";
+        for (let i = 0; i < 5; i += 1) {
+          const angle = (Math.PI * 2 * i) / 5 + performance.now() / 900;
+          ctx.beginPath();
+          ctx.arc(hazard.x + Math.cos(angle) * hazard.radius * 0.48, hazard.y + Math.sin(angle) * hazard.radius * 0.38, 9, 0, Math.PI * 2);
+          ctx.fill();
+        }
+        ctx.restore();
+        continue;
+      }
+
       if (hazard.type === "rocket") {
         const elapsed = hazard.total - hazard.timer;
         ctx.save();
         ctx.translate(hazard.x, hazard.y);
-        if (elapsed < 0.6) {
+        if (elapsed < 0.72) {
           ctx.strokeStyle = "#f2b85b";
           ctx.lineWidth = 5;
           ctx.beginPath();
-          ctx.arc(0, 0, 190 + Math.sin(performance.now() / 55) * 10, 0, Math.PI * 2);
+          ctx.arc(0, 0, 230 + Math.sin(performance.now() / 55) * 12, 0, Math.PI * 2);
           ctx.stroke();
           ctx.fillStyle = "#f2b85b";
           ctx.font = "900 16px ui-sans-serif, system-ui";
           ctx.textAlign = "center";
           ctx.fillText("STARSHIP", 0, -210);
         } else {
-          const shock = Math.min(720, (elapsed - 0.6) * 1200);
+          const shock = Math.min(940, (elapsed - 0.72) * 1300);
           ctx.strokeStyle = "rgba(242, 184, 91, 0.55)";
           ctx.lineWidth = 8;
           ctx.beginPath();
@@ -361,7 +384,7 @@ export class Renderer {
           ctx.stroke();
           ctx.fillStyle = "rgba(239, 125, 87, 0.42)";
           ctx.beginPath();
-          ctx.arc(0, 0, 210, 0, Math.PI * 2);
+          ctx.arc(0, 0, 265, 0, Math.PI * 2);
           ctx.fill();
           ctx.fillStyle = "#cfd8df";
           ctx.fillRect(-18, -190, 36, 170);
@@ -464,10 +487,11 @@ export class Renderer {
 
   drawEnemyStatus(ctx, enemy) {
     const barWidth = enemy.radius * 2.2;
+    const statusY = enemy.bossKind === "elon" ? enemy.y - 118 : enemy.y - enemy.radius - 16;
     ctx.fillStyle = "rgba(0, 0, 0, 0.45)";
-    ctx.fillRect(enemy.x - barWidth / 2, enemy.y - enemy.radius - 16, barWidth, 6);
+    ctx.fillRect(enemy.x - barWidth / 2, statusY, barWidth, 6);
     ctx.fillStyle = enemy.type === "boss" ? "#a747d9" : "#d95757";
-    ctx.fillRect(enemy.x - barWidth / 2, enemy.y - enemy.radius - 16, barWidth * Math.max(0, enemy.hp / enemy.maxHp), 6);
+    ctx.fillRect(enemy.x - barWidth / 2, statusY, barWidth * Math.max(0, enemy.hp / enemy.maxHp), 6);
 
     if (enemy.specialCooldown < 0.25 && (enemy.type === "brute" || enemy.type === "ranger" || enemy.type === "boss")) {
       ctx.strokeStyle = "#f2b85b";
@@ -504,13 +528,13 @@ export class Renderer {
       const color = state === "green" ? "#5ec28c" : state === "red" ? "#d95757" : "#afa89e";
       ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
       ctx.beginPath();
-      this.drawRoundRect(ctx, enemy.x - 42, enemy.y - enemy.radius - 36, 84, 18, 5);
+      this.drawRoundRect(ctx, enemy.x - 42, statusY - 24, 84, 18, 5);
       ctx.fill();
       ctx.fillStyle = color;
       ctx.font = "900 12px ui-sans-serif, system-ui";
       ctx.textAlign = "center";
       const ticker = state === "green" ? "X +15%" : state === "red" ? "X DEF" : "X --";
-      ctx.fillText(ticker, enemy.x, enemy.y - enemy.radius - 23);
+      ctx.fillText(ticker, enemy.x, statusY - 11);
       ctx.textAlign = "start";
       if (enemy.podTimer > 0) {
         ctx.strokeStyle = "#d8f2ff";
@@ -537,7 +561,7 @@ export class Renderer {
   }
 
   drawEnemySprite(ctx, enemy) {
-    const spriteId = enemy.bossKind === "broadcaster" ? "bossBroadcaster" : null;
+    const spriteId = enemy.bossKind === "broadcaster" ? "bossBroadcaster" : enemy.bossKind === "elon" ? "bossElon" : null;
     if (!spriteId) {
       return false;
     }

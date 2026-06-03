@@ -1,4 +1,4 @@
-const CACHE_NAME = "classbound-delve-v20";
+const CACHE_NAME = "classbound-delve-v21";
 const CORE_ASSETS = [
   "./",
   "./index.html",
@@ -24,6 +24,7 @@ const CORE_ASSETS = [
   "./assets/sprites/swordsman.png",
   "./assets/sprites/archer.png",
   "./assets/sprites/boss_broadcaster.png",
+  "./assets/sprites/elon_boss.png",
   "./assets/icons/icon-192.png",
   "./assets/icons/icon-512.png"
 ];

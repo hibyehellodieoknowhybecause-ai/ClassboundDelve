@@ -42,6 +42,18 @@ export const spriteSheets = {
       liveStream: { row: 5, frames: 8, fps: 14 },
       hurt: { row: 6, frames: 2, fps: 6 }
     }
+  },
+  bossElon: {
+    src: "./assets/sprites/elon_boss.png",
+    frameWidth: 97,
+    frameHeight: 220,
+    drawWidth: 86,
+    drawHeight: 196,
+    animations: {
+      idle: { row: 0, frames: 1, fps: 1 },
+      walk: { row: 0, frames: 1, fps: 1 },
+      attack: { row: 0, frames: 1, fps: 1 }
+    }
   }
 };
 
