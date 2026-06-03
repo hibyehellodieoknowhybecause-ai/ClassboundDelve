@@ -57,10 +57,10 @@ export class UI {
     this.elements.startCoop.addEventListener("click", () => callbacks.start("mannequin", 2));
     this.elements.openSettings.addEventListener("click", () => this.showSettings());
     this.elements.closeSettings.addEventListener("click", () => this.hideSettings());
-    this.elements.controlsTab.addEventListener("click", () => this.showSettingsTab("controls"));
-    this.elements.upgradesTab.addEventListener("click", () => this.showSettingsTab("upgrades"));
-    this.elements.itemsTab.addEventListener("click", () => this.showSettingsTab("items"));
-    this.elements.secretCodesTab.addEventListener("click", () => this.showSettingsTab("secretCodes"));
+    this.bindSettingsTab(this.elements.controlsTab, "controls");
+    this.bindSettingsTab(this.elements.upgradesTab, "upgrades");
+    this.bindSettingsTab(this.elements.itemsTab, "items");
+    this.bindSettingsTab(this.elements.secretCodesTab, "secretCodes");
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
       this.pendingKeybinds = resetKeybinds();
@@ -91,6 +91,15 @@ export class UI {
       this.listeningFor = null;
       this.renderKeybinds();
     }, true);
+  }
+
+  bindSettingsTab(button, tab) {
+    const activate = (event) => {
+      event.preventDefault();
+      this.showSettingsTab(tab);
+    };
+    button.addEventListener("click", activate);
+    button.addEventListener("touchend", activate, { passive: false });
   }
 
   bindTouchControls() {

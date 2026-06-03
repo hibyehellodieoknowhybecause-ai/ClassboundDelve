@@ -60,6 +60,7 @@ body {
 .overlay {
   position: absolute;
   inset: 0;
+  z-index: 5;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -275,6 +276,8 @@ h2 {
 .settings-tabs {
   display: flex;
   flex-wrap: wrap;
+  position: relative;
+  z-index: 1;
   gap: 8px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--line);
@@ -284,6 +287,7 @@ h2 {
 .tab-button {
   min-height: 36px;
   padding: 0 14px;
+  touch-action: manipulation;
 }
 
 .tab-button.active {
@@ -681,9 +685,18 @@ input:focus {
   }
 
   .menu-actions button,
-  .settings-actions button,
+  .settings-actions button {
+    width: 100%;
+  }
+
+  .settings-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .tab-button {
-    flex: 1 1 140px;
+    width: 100%;
+    min-width: 0;
   }
 
   .item-row {
@@ -7045,10 +7058,10 @@ class UI {
     this.elements.startCoop.addEventListener("click", () => callbacks.start("mannequin", 2));
     this.elements.openSettings.addEventListener("click", () => this.showSettings());
     this.elements.closeSettings.addEventListener("click", () => this.hideSettings());
-    this.elements.controlsTab.addEventListener("click", () => this.showSettingsTab("controls"));
-    this.elements.upgradesTab.addEventListener("click", () => this.showSettingsTab("upgrades"));
-    this.elements.itemsTab.addEventListener("click", () => this.showSettingsTab("items"));
-    this.elements.secretCodesTab.addEventListener("click", () => this.showSettingsTab("secretCodes"));
+    this.bindSettingsTab(this.elements.controlsTab, "controls");
+    this.bindSettingsTab(this.elements.upgradesTab, "upgrades");
+    this.bindSettingsTab(this.elements.itemsTab, "items");
+    this.bindSettingsTab(this.elements.secretCodesTab, "secretCodes");
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
       this.pendingKeybinds = resetKeybinds();
@@ -7079,6 +7092,15 @@ class UI {
       this.listeningFor = null;
       this.renderKeybinds();
     }, true);
+  }
+
+  bindSettingsTab(button, tab) {
+    const activate = (event) => {
+      event.preventDefault();
+      this.showSettingsTab(tab);
+    };
+    button.addEventListener("click", activate);
+    button.addEventListener("touchend", activate, { passive: false });
   }
 
   bindTouchControls() {
