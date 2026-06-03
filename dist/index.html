@@ -412,6 +412,115 @@ input:focus {
   font-weight: 800;
 }
 
+.upgrades-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.95fr) minmax(260px, 1.05fr);
+  gap: 14px;
+  min-height: 360px;
+}
+
+.upgrade-list {
+  display: grid;
+  align-content: start;
+  gap: 8px;
+  max-height: min(520px, 58vh);
+  overflow-y: auto;
+  padding-right: 4px;
+  scrollbar-color: rgba(242, 184, 91, 0.7) rgba(255, 255, 255, 0.08);
+}
+
+.upgrade-group {
+  margin: 8px 0 2px;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.upgrade-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 58px;
+  border-color: var(--rarity-color);
+  padding: 8px 10px;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.upgrade-row.selected {
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: inset 3px 0 0 var(--rarity-color);
+}
+
+.upgrade-row-main {
+  min-width: 0;
+}
+
+.upgrade-name,
+.upgrade-meta,
+.upgrade-count {
+  display: block;
+}
+
+.upgrade-name {
+  overflow: hidden;
+  color: var(--ink);
+  font-weight: 900;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.upgrade-meta {
+  margin-top: 3px;
+  color: var(--rarity-color);
+  font-size: 0.72rem;
+  font-weight: 900;
+}
+
+.upgrade-count {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--ink);
+  background: rgba(0, 0, 0, 0.24);
+  font-size: 0.78rem;
+}
+
+.upgrade-detail {
+  min-height: 260px;
+  border: 1px solid var(--rarity-color, var(--line));
+  border-radius: 8px;
+  padding: 16px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.upgrade-detail h3 {
+  margin-bottom: 8px;
+  color: var(--rarity-color, var(--ink));
+}
+
+.upgrade-detail-meta {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.upgrade-detail-description {
+  color: var(--ink);
+  line-height: 1.45;
+}
+
+.upgrade-empty {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  color: var(--muted);
+  background: rgba(255, 255, 255, 0.04);
+}
+
 .touch-controls {
   position: absolute;
   inset: 0;
@@ -500,6 +609,14 @@ input:focus {
 
   .input-row {
     flex-direction: column;
+  }
+
+  .upgrades-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .upgrade-list {
+    max-height: 34vh;
   }
 
   .menu-panel,
@@ -618,6 +735,7 @@ input:focus {
 
           <div class="settings-tabs" role="tablist" aria-label="Settings sections">
             <button id="controlsTab" class="tab-button active" type="button">Controls</button>
+            <button id="upgradesTab" class="tab-button" type="button">Upgrades</button>
             <button id="secretCodesTab" class="tab-button" type="button">Secret Codes</button>
           </div>
 
@@ -626,6 +744,20 @@ input:focus {
             <div class="settings-actions">
               <button id="resetKeybinds" class="secondary">Reset Defaults</button>
               <button id="saveSettings" class="primary">Save</button>
+            </div>
+          </div>
+
+          <div id="upgradesPanel" class="settings-section hidden">
+            <div class="upgrades-layout">
+              <div>
+                <div id="upgradeRows" class="upgrade-list"></div>
+              </div>
+              <aside id="upgradeDetail" class="upgrade-detail">
+                <p class="eyebrow">Upgrade Details</p>
+                <h3 id="upgradeDetailName">No upgrade selected</h3>
+                <p id="upgradeDetailMeta" class="upgrade-detail-meta"></p>
+                <p id="upgradeDetailDescription" class="upgrade-detail-description">Click an upgrade to read what it does.</p>
+              </aside>
             </div>
           </div>
 
@@ -1857,6 +1989,20 @@ function rollRewardOptions(player, count = 3, chestRarity = "common") {
     options[options.length - 1] = freshReward;
   }
   return options;
+}
+
+function rewardInfoFor(id) {
+  const reward = rewardPool.find((candidate) => candidate.id === id) ?? shopPool.find((candidate) => candidate.id === id);
+  if (!reward) {
+    return null;
+  }
+  return {
+    id: reward.id,
+    name: reward.name,
+    type: reward.type,
+    rarity: reward.rarity,
+    description: reward.description
+  };
 }
 
 function rollShopOptions(player, count = 3) {
@@ -6716,6 +6862,9 @@ function isEditableTarget(target) {
 
 // src/ui.js
 
+const rarityOrder = ["common", "uncommon", "rare", "epic", "legendary"];
+const upgradeTypes = new Set(["Stat", "Passive", "Ability", "Pet", "Evolution"]);
+
 class UI {
   constructor(input) {
     this.input = input;
@@ -6730,10 +6879,17 @@ class UI {
       openSettings: document.querySelector("#openSettings"),
       closeSettings: document.querySelector("#closeSettings"),
       controlsTab: document.querySelector("#controlsTab"),
+      upgradesTab: document.querySelector("#upgradesTab"),
       secretCodesTab: document.querySelector("#secretCodesTab"),
       controlsPanel: document.querySelector("#controlsPanel"),
+      upgradesPanel: document.querySelector("#upgradesPanel"),
       secretCodesPanel: document.querySelector("#secretCodesPanel"),
       keybindRows: document.querySelector("#keybindRows"),
+      upgradeRows: document.querySelector("#upgradeRows"),
+      upgradeDetail: document.querySelector("#upgradeDetail"),
+      upgradeDetailName: document.querySelector("#upgradeDetailName"),
+      upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
+      upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
       saveSettings: document.querySelector("#saveSettings"),
       secretCodeForm: document.querySelector("#secretCodeForm"),
@@ -6760,6 +6916,7 @@ class UI {
     this.elements.openSettings.addEventListener("click", () => this.showSettings());
     this.elements.closeSettings.addEventListener("click", () => this.hideSettings());
     this.elements.controlsTab.addEventListener("click", () => this.showSettingsTab("controls"));
+    this.elements.upgradesTab.addEventListener("click", () => this.showSettingsTab("upgrades"));
     this.elements.secretCodesTab.addEventListener("click", () => this.showSettingsTab("secretCodes"));
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
@@ -6854,11 +7011,101 @@ class UI {
   }
 
   showSettingsTab(tab) {
+    const controlsActive = tab === "controls";
+    const upgradesActive = tab === "upgrades";
     const secretActive = tab === "secretCodes";
-    this.elements.controlsTab.classList.toggle("active", !secretActive);
+    this.elements.controlsTab.classList.toggle("active", controlsActive);
+    this.elements.upgradesTab.classList.toggle("active", upgradesActive);
     this.elements.secretCodesTab.classList.toggle("active", secretActive);
-    this.elements.controlsPanel.classList.toggle("hidden", secretActive);
+    this.elements.controlsPanel.classList.toggle("hidden", !controlsActive);
+    this.elements.upgradesPanel.classList.toggle("hidden", !upgradesActive);
     this.elements.secretCodesPanel.classList.toggle("hidden", !secretActive);
+    if (upgradesActive) {
+      this.renderUpgrades();
+    }
+  }
+
+  renderUpgrades() {
+    const rows = this.elements.upgradeRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.upgradeEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">No upgrades gained yet.</div>`;
+      this.showUpgradeDetail(null);
+      return;
+    }
+
+    let currentGroup = "";
+    entries.forEach((entry, index) => {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "upgrade-row";
+      button.style.setProperty("--rarity-color", rewardColors[entry.rarity] ?? "#f6f1e8");
+      button.innerHTML = `
+        <span class="upgrade-row-main">
+          <span class="upgrade-name">${entry.name}</span>
+          <span class="upgrade-meta">${entry.rarity.toUpperCase()} · ${entry.type}</span>
+        </span>
+        ${entry.count > 1 ? `<span class="upgrade-count">x${entry.count}</span>` : ""}
+      `;
+      button.addEventListener("click", () => {
+        rows.querySelectorAll(".upgrade-row.selected").forEach((candidate) => candidate.classList.remove("selected"));
+        button.classList.add("selected");
+        this.showUpgradeDetail(entry);
+      });
+      rows.appendChild(button);
+      if (index === 0) {
+        button.classList.add("selected");
+        this.showUpgradeDetail(entry);
+      }
+    });
+  }
+
+  upgradeEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+
+    const counts = new Map();
+    for (const id of player.rewardHistory ?? []) {
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([id, count]) => ({ ...rewardInfoFor(id), count, group: player.label ?? "Player" }))
+      .filter((entry) => entry.id && upgradeTypes.has(entry.type))
+      .sort((a, b) => {
+        const rarityDelta = rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+        if (rarityDelta !== 0) {
+          return rarityDelta;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  showUpgradeDetail(entry) {
+    if (!entry) {
+      this.elements.upgradeDetailName.textContent = "No upgrade selected";
+      this.elements.upgradeDetailMeta.textContent = "";
+      this.elements.upgradeDetailDescription.textContent = "Click an upgrade to read what it does.";
+      this.elements.upgradeDetail.style.removeProperty("--rarity-color");
+      return;
+    }
+
+    this.elements.upgradeDetail.style.setProperty("--rarity-color", rewardColors[entry.rarity] ?? "#f6f1e8");
+    this.elements.upgradeDetailName.textContent = entry.name;
+    this.elements.upgradeDetailMeta.textContent = `${entry.group} · ${entry.rarity.toUpperCase()} · ${entry.type}${entry.count > 1 ? ` · x${entry.count}` : ""}`;
+    this.elements.upgradeDetailDescription.textContent = entry.description ?? "No description available.";
   }
 
   submitSecretCode() {
@@ -6939,6 +7186,7 @@ class UI {
     this.setTouchControlsVisible(false);
     this.pendingKeybinds = { ...this.input.keybinds };
     this.renderKeybinds();
+    this.renderUpgrades();
     this.showSettingsTab("controls");
     this.elements.settings.classList.remove("hidden");
   }
@@ -7932,7 +8180,8 @@ const game = new Game(input, ui, renderer);
 ui.init({
   start: (characterId, playerCount) => game.start(characterId, playerCount),
   secretCode: (code) => game.handleSecretCode(code),
-  grantCoins: (amount) => game.grantCoins(amount)
+  grantCoins: (amount) => game.grantCoins(amount),
+  players: () => game.players
 });
 
 requestAnimationFrame(game.loop);

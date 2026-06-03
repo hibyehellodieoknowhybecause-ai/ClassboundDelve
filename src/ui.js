@@ -1,4 +1,8 @@
 import { keybindLabels, codeToLabel, resetKeybinds, saveKeybinds } from "./settings.js";
+import { rewardColors, rewardInfoFor } from "./data/rewards.js";
+
+const rarityOrder = ["common", "uncommon", "rare", "epic", "legendary"];
+const upgradeTypes = new Set(["Stat", "Passive", "Ability", "Pet", "Evolution"]);
 
 export class UI {
   constructor(input) {
@@ -14,10 +18,17 @@ export class UI {
       openSettings: document.querySelector("#openSettings"),
       closeSettings: document.querySelector("#closeSettings"),
       controlsTab: document.querySelector("#controlsTab"),
+      upgradesTab: document.querySelector("#upgradesTab"),
       secretCodesTab: document.querySelector("#secretCodesTab"),
       controlsPanel: document.querySelector("#controlsPanel"),
+      upgradesPanel: document.querySelector("#upgradesPanel"),
       secretCodesPanel: document.querySelector("#secretCodesPanel"),
       keybindRows: document.querySelector("#keybindRows"),
+      upgradeRows: document.querySelector("#upgradeRows"),
+      upgradeDetail: document.querySelector("#upgradeDetail"),
+      upgradeDetailName: document.querySelector("#upgradeDetailName"),
+      upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
+      upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
       saveSettings: document.querySelector("#saveSettings"),
       secretCodeForm: document.querySelector("#secretCodeForm"),
@@ -44,6 +55,7 @@ export class UI {
     this.elements.openSettings.addEventListener("click", () => this.showSettings());
     this.elements.closeSettings.addEventListener("click", () => this.hideSettings());
     this.elements.controlsTab.addEventListener("click", () => this.showSettingsTab("controls"));
+    this.elements.upgradesTab.addEventListener("click", () => this.showSettingsTab("upgrades"));
     this.elements.secretCodesTab.addEventListener("click", () => this.showSettingsTab("secretCodes"));
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
@@ -138,11 +150,101 @@ export class UI {
   }
 
   showSettingsTab(tab) {
+    const controlsActive = tab === "controls";
+    const upgradesActive = tab === "upgrades";
     const secretActive = tab === "secretCodes";
-    this.elements.controlsTab.classList.toggle("active", !secretActive);
+    this.elements.controlsTab.classList.toggle("active", controlsActive);
+    this.elements.upgradesTab.classList.toggle("active", upgradesActive);
     this.elements.secretCodesTab.classList.toggle("active", secretActive);
-    this.elements.controlsPanel.classList.toggle("hidden", secretActive);
+    this.elements.controlsPanel.classList.toggle("hidden", !controlsActive);
+    this.elements.upgradesPanel.classList.toggle("hidden", !upgradesActive);
     this.elements.secretCodesPanel.classList.toggle("hidden", !secretActive);
+    if (upgradesActive) {
+      this.renderUpgrades();
+    }
+  }
+
+  renderUpgrades() {
+    const rows = this.elements.upgradeRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.upgradeEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">No upgrades gained yet.</div>`;
+      this.showUpgradeDetail(null);
+      return;
+    }
+
+    let currentGroup = "";
+    entries.forEach((entry, index) => {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "upgrade-row";
+      button.style.setProperty("--rarity-color", rewardColors[entry.rarity] ?? "#f6f1e8");
+      button.innerHTML = `
+        <span class="upgrade-row-main">
+          <span class="upgrade-name">${entry.name}</span>
+          <span class="upgrade-meta">${entry.rarity.toUpperCase()} · ${entry.type}</span>
+        </span>
+        ${entry.count > 1 ? `<span class="upgrade-count">x${entry.count}</span>` : ""}
+      `;
+      button.addEventListener("click", () => {
+        rows.querySelectorAll(".upgrade-row.selected").forEach((candidate) => candidate.classList.remove("selected"));
+        button.classList.add("selected");
+        this.showUpgradeDetail(entry);
+      });
+      rows.appendChild(button);
+      if (index === 0) {
+        button.classList.add("selected");
+        this.showUpgradeDetail(entry);
+      }
+    });
+  }
+
+  upgradeEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+
+    const counts = new Map();
+    for (const id of player.rewardHistory ?? []) {
+      counts.set(id, (counts.get(id) ?? 0) + 1);
+    }
+
+    return [...counts.entries()]
+      .map(([id, count]) => ({ ...rewardInfoFor(id), count, group: player.label ?? "Player" }))
+      .filter((entry) => entry.id && upgradeTypes.has(entry.type))
+      .sort((a, b) => {
+        const rarityDelta = rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
+        if (rarityDelta !== 0) {
+          return rarityDelta;
+        }
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  showUpgradeDetail(entry) {
+    if (!entry) {
+      this.elements.upgradeDetailName.textContent = "No upgrade selected";
+      this.elements.upgradeDetailMeta.textContent = "";
+      this.elements.upgradeDetailDescription.textContent = "Click an upgrade to read what it does.";
+      this.elements.upgradeDetail.style.removeProperty("--rarity-color");
+      return;
+    }
+
+    this.elements.upgradeDetail.style.setProperty("--rarity-color", rewardColors[entry.rarity] ?? "#f6f1e8");
+    this.elements.upgradeDetailName.textContent = entry.name;
+    this.elements.upgradeDetailMeta.textContent = `${entry.group} · ${entry.rarity.toUpperCase()} · ${entry.type}${entry.count > 1 ? ` · x${entry.count}` : ""}`;
+    this.elements.upgradeDetailDescription.textContent = entry.description ?? "No description available.";
   }
 
   submitSecretCode() {
@@ -223,6 +325,7 @@ export class UI {
     this.setTouchControlsVisible(false);
     this.pendingKeybinds = { ...this.input.keybinds };
     this.renderKeybinds();
+    this.renderUpgrades();
     this.showSettingsTab("controls");
     this.elements.settings.classList.remove("hidden");
   }

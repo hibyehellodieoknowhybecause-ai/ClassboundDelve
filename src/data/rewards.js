@@ -799,6 +799,20 @@ export function rollRewardOptions(player, count = 3, chestRarity = "common") {
   return options;
 }
 
+export function rewardInfoFor(id) {
+  const reward = rewardPool.find((candidate) => candidate.id === id) ?? shopPool.find((candidate) => candidate.id === id);
+  if (!reward) {
+    return null;
+  }
+  return {
+    id: reward.id,
+    name: reward.name,
+    type: reward.type,
+    rarity: reward.rarity,
+    description: reward.description
+  };
+}
+
 export function rollShopOptions(player, count = 3) {
   let stock = filteredPool(player, shopPool)
     .filter((item) => Math.random() < (item.stockChance ?? 1))

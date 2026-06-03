@@ -61,6 +61,7 @@
 
           <div class="settings-tabs" role="tablist" aria-label="Settings sections">
             <button id="controlsTab" class="tab-button active" type="button">Controls</button>
+            <button id="upgradesTab" class="tab-button" type="button">Upgrades</button>
             <button id="secretCodesTab" class="tab-button" type="button">Secret Codes</button>
           </div>
 
@@ -69,6 +70,20 @@
             <div class="settings-actions">
               <button id="resetKeybinds" class="secondary">Reset Defaults</button>
               <button id="saveSettings" class="primary">Save</button>
+            </div>
+          </div>
+
+          <div id="upgradesPanel" class="settings-section hidden">
+            <div class="upgrades-layout">
+              <div>
+                <div id="upgradeRows" class="upgrade-list"></div>
+              </div>
+              <aside id="upgradeDetail" class="upgrade-detail">
+                <p class="eyebrow">Upgrade Details</p>
+                <h3 id="upgradeDetailName">No upgrade selected</h3>
+                <p id="upgradeDetailMeta" class="upgrade-detail-meta"></p>
+                <p id="upgradeDetailDescription" class="upgrade-detail-description">Click an upgrade to read what it does.</p>
+              </aside>
             </div>
           </div>
 

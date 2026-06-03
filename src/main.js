@@ -12,7 +12,8 @@ const game = new Game(input, ui, renderer);
 ui.init({
   start: (characterId, playerCount) => game.start(characterId, playerCount),
   secretCode: (code) => game.handleSecretCode(code),
-  grantCoins: (amount) => game.grantCoins(amount)
+  grantCoins: (amount) => game.grantCoins(amount),
+  players: () => game.players
 });
 
 requestAnimationFrame(game.loop);
