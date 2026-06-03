@@ -1847,6 +1847,14 @@ function rollShopOptions(player, count = 3) {
   return stock;
 }
 
+function ensureGuaranteedShopStock(player, stock) {
+  if (stock.some((item) => item.id === "shopHealthPot")) {
+    return stock;
+  }
+  const healthPot = shopPool.find((item) => item.id === "shopHealthPot");
+  return healthPot ? [withShopCost(player, healthPot), ...stock] : stock;
+}
+
 function rollOptions(player, pool, count, weights) {
   const options = [];
   const used = new Set();
@@ -7512,6 +7520,7 @@ class Game {
         if (!target.stock) {
           target.stock = rollShopOptions(player, 6);
         }
+        target.stock = ensureGuaranteedShopStock(player, target.stock);
         if (target.stock.length === 0) {
           this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
           return;

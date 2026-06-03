@@ -1,6 +1,6 @@
 import { getCharacter, mannequinCharacter } from "./data/characters.js";
 import { weapons } from "./data/weapons.js";
-import { applyReward, canApplyReward, completeWeaponUpgrade, rollRewardOptions, rollShopOptions, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
+import { applyReward, canApplyReward, completeWeaponUpgrade, ensureGuaranteedShopStock, rollRewardOptions, rollShopOptions, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
 import { createDragonQuestStage, createHiddenQuestStage, createLobbyStage, createStage } from "./data/stages.js";
 import { Player } from "./player.js";
 import { createDragonEnemy, createEnemies, updateEnemies } from "./enemies.js";
@@ -574,6 +574,7 @@ export class Game {
         if (!target.stock) {
           target.stock = rollShopOptions(player, 6);
         }
+        target.stock = ensureGuaranteedShopStock(player, target.stock);
         if (target.stock.length === 0) {
           this.combat.floatText(player.x, player.y - 62, "Shop sold out", "#afa89e");
           return;

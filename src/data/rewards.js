@@ -787,6 +787,14 @@ export function rollShopOptions(player, count = 3) {
   return stock;
 }
 
+export function ensureGuaranteedShopStock(player, stock) {
+  if (stock.some((item) => item.id === "shopHealthPot")) {
+    return stock;
+  }
+  const healthPot = shopPool.find((item) => item.id === "shopHealthPot");
+  return healthPot ? [withShopCost(player, healthPot), ...stock] : stock;
+}
+
 function rollOptions(player, pool, count, weights) {
   const options = [];
   const used = new Set();
