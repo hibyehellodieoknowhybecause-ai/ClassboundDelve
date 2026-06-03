@@ -159,6 +159,46 @@ export function createHiddenQuestStage() {
   };
 }
 
+export function createDragonQuestStage() {
+  const room = {
+    width: 1880,
+    height: 1180,
+    margin: 90,
+    obstacles: [
+      { x: 260, y: 235, w: 190, h: 70 },
+      { x: 1420, y: 250, w: 210, h: 76 },
+      { x: 300, y: 810, w: 230, h: 82 },
+      { x: 1320, y: 790, w: 250, h: 88 }
+    ]
+  };
+
+  return {
+    number: "Dragon",
+    name: "Kingdom Dragon Lair",
+    isQuest: true,
+    isDragonQuest: true,
+    isBoss: true,
+    theme: {
+      id: "dragonLair",
+      name: "Kingdom Dragon Lair",
+      floor: "#221716",
+      tile: "#33211c",
+      wall: "#d95757",
+      obstacle: "#5a3828"
+    },
+    bossTier: 0,
+    enemyCount: 1,
+    room,
+    clearReward: 0,
+    enemyHpMultiplier: 1,
+    enemyDamageMultiplier: 1,
+    dragon: {
+      spawn: { x: room.width / 2, y: room.height / 2 - 150 },
+      playerStart: { x: room.width / 2, y: room.height - room.margin - 110 }
+    }
+  };
+}
+
 function createMaze(cols, rows) {
   const maze = Array.from({ length: rows }, () => Array.from({ length: cols }, () => true));
   const stack = [{ col: 1, row: 1 }];

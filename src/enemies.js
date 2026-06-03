@@ -223,6 +223,47 @@ export function createEnemies(stage) {
   return enemies;
 }
 
+export function createDragonEnemy(stage) {
+  const spawn = stage.dragon?.spawn ?? { x: stage.room.width / 2, y: stage.room.height / 2 };
+  return {
+    type: "boss",
+    bossKind: "dragon",
+    name: "Kingdom Dragon",
+    x: spawn.x,
+    y: spawn.y,
+    spawnX: spawn.x,
+    spawnY: spawn.y,
+    radius: 72,
+    hp: 4200,
+    maxHp: 4200,
+    speed: 74,
+    damage: 34,
+    sightRange: Infinity,
+    loseRange: Infinity,
+    leashRange: Infinity,
+    touchCooldown: 0.92,
+    attackRange: Infinity,
+    attackCooldown: 0,
+    specialCooldown: 1.1,
+    chargeTime: 0.5,
+    chargeSpeed: 4.1,
+    frozen: 0,
+    slowed: 0,
+    alert: true,
+    state: "chase",
+    stateTimer: 0,
+    phase: 0,
+    shieldTimer: 0,
+    dragonShieldDown: 0,
+    supporterTimer: Infinity,
+    timeSinceHit: 0,
+    regenerating: false,
+    spriteAction: "idle",
+    color: "#d95757",
+    habit: "uses breath, fireballs, charges, and bites; gold bars stun it and break its shield"
+  };
+}
+
 export function updateEnemies(enemies, players, dt, room, combat) {
   const livePlayers = Array.isArray(players) ? players.filter((player) => player.hp > 0) : [players].filter(Boolean);
   if (livePlayers.length === 0) {
@@ -330,6 +371,7 @@ function tickEnemyTimers(enemy, dt) {
   enemy.frozen = Math.max(0, enemy.frozen - dt);
   enemy.slowed = Math.max(0, (enemy.slowed ?? 0) - dt);
   enemy.shieldTimer = Math.max(0, (enemy.shieldTimer ?? 0) - dt);
+  enemy.dragonShieldDown = Math.max(0, (enemy.dragonShieldDown ?? 0) - dt);
   enemy.supporterTimer = Math.max(0, (enemy.supporterTimer ?? 0) - dt);
   enemy.stateTimer = Math.max(0, enemy.stateTimer - dt);
   if (enemy.wander) {
@@ -365,6 +407,15 @@ function updateEnemyStatuses(enemy, dt, combat) {
     enemy.regenerating = false;
     if (Math.random() < 0.02) {
       combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Bleed", "#d95757");
+    }
+  }
+  if (enemy.burning?.timer > 0) {
+    enemy.burning.timer -= dt;
+    enemy.hp -= enemy.maxHp * enemy.burning.rate * dt;
+    enemy.timeSinceHit = 0;
+    enemy.regenerating = false;
+    if (Math.random() < 0.03) {
+      combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Burn", "#ef7d57");
     }
   }
 }
@@ -406,7 +457,7 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
 
   if (enemy.state === "windup") {
     if (enemy.stateTimer <= 0) {
-        finishWindup(enemy, player, combat, enemies);
+      finishWindup(enemy, player, combat, enemies);
     }
     return;
   }
@@ -462,6 +513,10 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
   }
 
   if (enemy.type === "boss") {
+    if (enemy.bossKind === "dragon") {
+      updateDragonBoss(enemy, player, dt, combat);
+      return;
+    }
     updateBoss(enemy, player, dt, combat, enemies, room);
     return;
   }
@@ -681,6 +736,58 @@ function startWindup(enemy, nextAction, duration, combat, label) {
 }
 
 function finishWindup(enemy, player, combat, enemies = []) {
+  if (enemy.nextAction === "dragonBreath") {
+    const baseAngle = angleTo(enemy, player);
+    for (let i = -3; i <= 3; i += 1) {
+      combat.spawnEnemyProjectile({
+        x: enemy.x + Math.cos(baseAngle) * 54,
+        y: enemy.y + Math.sin(baseAngle) * 54,
+        angle: baseAngle + i * 0.16,
+        speed: 420,
+        damage: enemy.damage * 0.48,
+        radius: 15,
+        color: "#ef7d57",
+        life: 1.05,
+        labelOnHit: "Burned"
+      });
+    }
+    enemy.specialCooldown = 1.6;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "dragonFireball") {
+    const baseAngle = angleTo(enemy, player);
+    for (let i = -1; i <= 1; i += 1) {
+      combat.spawnEnemyProjectile({
+        x: enemy.x,
+        y: enemy.y,
+        angle: baseAngle + i * 0.14,
+        speed: 330,
+        damage: enemy.damage * 0.72,
+        radius: 20,
+        color: "#f2b85b",
+        homing: true,
+        life: 1.75,
+        labelOnHit: "Fireball"
+      });
+    }
+    enemy.specialCooldown = 2.1;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "dragonBite") {
+    const hit = distance(enemy, player) <= enemy.radius + player.radius + 34 && player.takeDamage(enemy.damage * 1.45);
+    if (hit) {
+      combat.floatText(player.x, player.y - 46, `-${Math.round(enemy.damage * 1.45)}`, "#d95757");
+      combat.screenShake = Math.max(combat.screenShake, 10);
+    }
+    enemy.specialCooldown = 1.2;
+    enemy.state = "chase";
+    return;
+  }
+
   if (enemy.nextAction === "supporterPamphlet") {
     combat.spawnEnemyProjectile({
       x: enemy.x,
@@ -852,6 +959,29 @@ function finishWindup(enemy, player, combat, enemies = []) {
     enemy.specialCooldown = enemy.hp < enemy.maxHp * 0.5 ? randomRange(1.5, 2) : randomRange(2.1, 2.8);
     enemy.state = "chase";
   }
+}
+
+function updateDragonBoss(enemy, player, dt, combat) {
+  const dist = distance(enemy, player);
+  if (dist > 210) {
+    moveToward(enemy, player, dt, speedFor(enemy));
+  }
+
+  if (enemy.specialCooldown > 0) {
+    return;
+  }
+
+  const cycle = ["dragonBreath", "dragonFireball", "charge", "dragonBite"];
+  const action = cycle[enemy.phase % cycle.length];
+  enemy.phase += 1;
+  const label = {
+    dragonBreath: "Dragon Breath",
+    dragonFireball: "Fireball",
+    charge: "Charge",
+    dragonBite: "Bite"
+  }[action];
+  const windup = action === "charge" ? 0.44 : action === "dragonBite" ? 0.24 : 0.52;
+  startWindup(enemy, action, windup, combat, label);
 }
 
 function updateCharge(enemy, dt) {

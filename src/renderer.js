@@ -360,6 +360,20 @@ export class Renderer {
       ctx.stroke();
     }
 
+    if (enemy.bossKind === "dragon") {
+      const shieldActive = (enemy.dragonShieldDown ?? 0) <= 0;
+      ctx.strokeStyle = shieldActive ? "#f2b85b" : "#73a9ff";
+      ctx.lineWidth = shieldActive ? 5 : 4;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = shieldActive ? "#f2b85b" : "#73a9ff";
+      ctx.font = "900 13px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(shieldActive ? "80% SHIELD" : "STUNNED", enemy.x, enemy.y - enemy.radius - 26);
+      ctx.textAlign = "start";
+    }
+
     if (enemy.state === "windup") {
       ctx.strokeStyle = "#f2b85b";
       ctx.lineWidth = 4;
@@ -756,6 +770,28 @@ export class Renderer {
           ctx.font = "900 12px ui-sans-serif, system-ui";
           ctx.fillText(`x${item.amount}`, 0, 6);
         }
+        ctx.restore();
+        continue;
+      }
+
+      if (item.type === "goldBar") {
+        ctx.save();
+        ctx.translate(item.x, item.y + bob);
+        ctx.rotate(-0.22);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+        ctx.beginPath();
+        this.drawEllipse(ctx, 0, 23, 28, 8);
+        ctx.fill();
+
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = "#101317";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        this.drawRoundRect(ctx, -26, -12, 52, 24, 5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(246, 241, 232, 0.38)";
+        ctx.fillRect(-17, -6, 34, 4);
         ctx.restore();
         continue;
       }
@@ -1424,6 +1460,9 @@ export class Renderer {
     }
     if (item.type === "material") {
       return `${prefix}Press interact to pick up ${item.name ?? "material"}`;
+    }
+    if (item.type === "goldBar") {
+      return `${prefix}Press interact to throw Gold Bar`;
     }
     if (item.type === "sage") {
       return `${prefix}Press interact to deliver the message`;

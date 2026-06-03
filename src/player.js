@@ -73,8 +73,15 @@ export class Player {
         started: false,
         stage: null,
         progress: 0
+      },
+      kingdom: {
+        started: false,
+        stage: null,
+        complete: false
       }
     };
+    this.dragonHeart = false;
+    this.dragonFireBreath = false;
     this.inventoryMessage = "";
     this.isMoving = false;
     this.animationTime = 0;
@@ -186,6 +193,9 @@ export class Player {
   }
 
   extraAbilityCooldownMax() {
+    if (this.extraAbilityId === "fireBreath") {
+      return 8.5;
+    }
     return this.character.classId === "swordsman" ? 7.5 : 6.5;
   }
 
@@ -470,6 +480,34 @@ export class Player {
       });
       this.extraAbilityCooldown = this.extraAbilityCooldownMax();
       combat.floatText(target.x, target.y - 58, "Arrow Storm", this.character.accent);
+      return;
+    }
+
+    if (this.extraAbilityId === "fireBreath") {
+      const target = this.nearestEnemy();
+      const baseAngle = target ? angleTo(this, target) : Math.atan2(this.lastMove.y, this.lastMove.x);
+      this.facing = baseAngle;
+      for (let i = -4; i <= 4; i += 1) {
+        const angle = baseAngle + i * 0.11;
+        combat.spawnProjectile({
+          owner: this,
+          faction: "player",
+          x: this.x + Math.cos(angle) * 32,
+          y: this.y + Math.sin(angle) * 32,
+          angle,
+          speed: 700,
+          radius: 12,
+          damage: this.attackDamage() * 0.72,
+          life: 0.62,
+          color: "#ef7d57",
+          burn: {
+            duration: 3.2,
+            rate: 0.012
+          }
+        });
+      }
+      this.extraAbilityCooldown = this.extraAbilityCooldownMax();
+      combat.floatText(this.x, this.y - 58, "Fire Breath", "#ef7d57");
     }
   }
 

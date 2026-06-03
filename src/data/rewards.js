@@ -641,6 +641,24 @@ const shopPool = [
     }
   },
   {
+    id: "kingdomRequest",
+    type: "Quest",
+    name: "The Kingdom's Request",
+    rarity: "legendary",
+    stockChance: 0.1,
+    baseCost: 1500,
+    unique: true,
+    maxCount: 1,
+    description: "Help the kingdom slay a shielded dragon.",
+    apply(player) {
+      player.questlines.kingdom = {
+        started: true,
+        stage: "ready",
+        complete: false
+      };
+    }
+  },
+  {
     id: "weaponAscensionMaterial",
     type: "Material",
     name: "Weapon evolution material",

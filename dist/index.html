@@ -1701,6 +1701,24 @@ const shopPool = [
     }
   },
   {
+    id: "kingdomRequest",
+    type: "Quest",
+    name: "The Kingdom's Request",
+    rarity: "legendary",
+    stockChance: 0.1,
+    baseCost: 1500,
+    unique: true,
+    maxCount: 1,
+    description: "Help the kingdom slay a shielded dragon.",
+    apply(player) {
+      player.questlines.kingdom = {
+        started: true,
+        stage: "ready",
+        complete: false
+      };
+    }
+  },
+  {
     id: "weaponAscensionMaterial",
     type: "Material",
     name: "Weapon evolution material",
@@ -2102,6 +2120,46 @@ function createHiddenQuestStage() {
   };
 }
 
+function createDragonQuestStage() {
+  const room = {
+    width: 1880,
+    height: 1180,
+    margin: 90,
+    obstacles: [
+      { x: 260, y: 235, w: 190, h: 70 },
+      { x: 1420, y: 250, w: 210, h: 76 },
+      { x: 300, y: 810, w: 230, h: 82 },
+      { x: 1320, y: 790, w: 250, h: 88 }
+    ]
+  };
+
+  return {
+    number: "Dragon",
+    name: "Kingdom Dragon Lair",
+    isQuest: true,
+    isDragonQuest: true,
+    isBoss: true,
+    theme: {
+      id: "dragonLair",
+      name: "Kingdom Dragon Lair",
+      floor: "#221716",
+      tile: "#33211c",
+      wall: "#d95757",
+      obstacle: "#5a3828"
+    },
+    bossTier: 0,
+    enemyCount: 1,
+    room,
+    clearReward: 0,
+    enemyHpMultiplier: 1,
+    enemyDamageMultiplier: 1,
+    dragon: {
+      spawn: { x: room.width / 2, y: room.height / 2 - 150 },
+      playerStart: { x: room.width / 2, y: room.height - room.margin - 110 }
+    }
+  };
+}
+
 function createMaze(cols, rows) {
   const maze = Array.from({ length: rows }, () => Array.from({ length: cols }, () => true));
   const stack = [{ col: 1, row: 1 }];
@@ -2444,6 +2502,12 @@ class CombatSystem {
               rate: projectile.bleed.rate
             };
           }
+          if (projectile.burn) {
+            enemy.burning = {
+              timer: projectile.burn.duration,
+              rate: projectile.burn.rate
+            };
+          }
           this.floatText(enemy.x, enemy.y - enemy.radius, Math.round(projectile.damage).toString(), projectile.color);
           projectile.life = 0;
           this.spawnProjectileEndPatch(projectile);
@@ -2645,6 +2709,11 @@ class CombatSystem {
           labelOnHit: "Pamphlets!"
         });
       }
+      return;
+    }
+    if (enemy.bossKind === "dragon" && (enemy.dragonShieldDown ?? 0) <= 0) {
+      damageEnemy(enemy, damage * 0.2, source, knockback * 0.25);
+      this.floatText(enemy.x, enemy.y - enemy.radius - 20, "Dragon Shield", "#f2b85b");
       return;
     }
     damageEnemy(enemy, damage, source, knockback);
@@ -2903,6 +2972,47 @@ function createEnemies(stage) {
   return enemies;
 }
 
+function createDragonEnemy(stage) {
+  const spawn = stage.dragon?.spawn ?? { x: stage.room.width / 2, y: stage.room.height / 2 };
+  return {
+    type: "boss",
+    bossKind: "dragon",
+    name: "Kingdom Dragon",
+    x: spawn.x,
+    y: spawn.y,
+    spawnX: spawn.x,
+    spawnY: spawn.y,
+    radius: 72,
+    hp: 4200,
+    maxHp: 4200,
+    speed: 74,
+    damage: 34,
+    sightRange: Infinity,
+    loseRange: Infinity,
+    leashRange: Infinity,
+    touchCooldown: 0.92,
+    attackRange: Infinity,
+    attackCooldown: 0,
+    specialCooldown: 1.1,
+    chargeTime: 0.5,
+    chargeSpeed: 4.1,
+    frozen: 0,
+    slowed: 0,
+    alert: true,
+    state: "chase",
+    stateTimer: 0,
+    phase: 0,
+    shieldTimer: 0,
+    dragonShieldDown: 0,
+    supporterTimer: Infinity,
+    timeSinceHit: 0,
+    regenerating: false,
+    spriteAction: "idle",
+    color: "#d95757",
+    habit: "uses breath, fireballs, charges, and bites; gold bars stun it and break its shield"
+  };
+}
+
 function updateEnemies(enemies, players, dt, room, combat) {
   const livePlayers = Array.isArray(players) ? players.filter((player) => player.hp > 0) : [players].filter(Boolean);
   if (livePlayers.length === 0) {
@@ -3010,6 +3120,7 @@ function tickEnemyTimers(enemy, dt) {
   enemy.frozen = Math.max(0, enemy.frozen - dt);
   enemy.slowed = Math.max(0, (enemy.slowed ?? 0) - dt);
   enemy.shieldTimer = Math.max(0, (enemy.shieldTimer ?? 0) - dt);
+  enemy.dragonShieldDown = Math.max(0, (enemy.dragonShieldDown ?? 0) - dt);
   enemy.supporterTimer = Math.max(0, (enemy.supporterTimer ?? 0) - dt);
   enemy.stateTimer = Math.max(0, enemy.stateTimer - dt);
   if (enemy.wander) {
@@ -3045,6 +3156,15 @@ function updateEnemyStatuses(enemy, dt, combat) {
     enemy.regenerating = false;
     if (Math.random() < 0.02) {
       combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Bleed", "#d95757");
+    }
+  }
+  if (enemy.burning?.timer > 0) {
+    enemy.burning.timer -= dt;
+    enemy.hp -= enemy.maxHp * enemy.burning.rate * dt;
+    enemy.timeSinceHit = 0;
+    enemy.regenerating = false;
+    if (Math.random() < 0.03) {
+      combat.floatText(enemy.x, enemy.y - enemy.radius - 12, "Burn", "#ef7d57");
     }
   }
 }
@@ -3086,7 +3206,7 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
 
   if (enemy.state === "windup") {
     if (enemy.stateTimer <= 0) {
-        finishWindup(enemy, player, combat, enemies);
+      finishWindup(enemy, player, combat, enemies);
     }
     return;
   }
@@ -3142,6 +3262,10 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
   }
 
   if (enemy.type === "boss") {
+    if (enemy.bossKind === "dragon") {
+      updateDragonBoss(enemy, player, dt, combat);
+      return;
+    }
     updateBoss(enemy, player, dt, combat, enemies, room);
     return;
   }
@@ -3361,6 +3485,58 @@ function startWindup(enemy, nextAction, duration, combat, label) {
 }
 
 function finishWindup(enemy, player, combat, enemies = []) {
+  if (enemy.nextAction === "dragonBreath") {
+    const baseAngle = angleTo(enemy, player);
+    for (let i = -3; i <= 3; i += 1) {
+      combat.spawnEnemyProjectile({
+        x: enemy.x + Math.cos(baseAngle) * 54,
+        y: enemy.y + Math.sin(baseAngle) * 54,
+        angle: baseAngle + i * 0.16,
+        speed: 420,
+        damage: enemy.damage * 0.48,
+        radius: 15,
+        color: "#ef7d57",
+        life: 1.05,
+        labelOnHit: "Burned"
+      });
+    }
+    enemy.specialCooldown = 1.6;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "dragonFireball") {
+    const baseAngle = angleTo(enemy, player);
+    for (let i = -1; i <= 1; i += 1) {
+      combat.spawnEnemyProjectile({
+        x: enemy.x,
+        y: enemy.y,
+        angle: baseAngle + i * 0.14,
+        speed: 330,
+        damage: enemy.damage * 0.72,
+        radius: 20,
+        color: "#f2b85b",
+        homing: true,
+        life: 1.75,
+        labelOnHit: "Fireball"
+      });
+    }
+    enemy.specialCooldown = 2.1;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "dragonBite") {
+    const hit = distance(enemy, player) <= enemy.radius + player.radius + 34 && player.takeDamage(enemy.damage * 1.45);
+    if (hit) {
+      combat.floatText(player.x, player.y - 46, `-${Math.round(enemy.damage * 1.45)}`, "#d95757");
+      combat.screenShake = Math.max(combat.screenShake, 10);
+    }
+    enemy.specialCooldown = 1.2;
+    enemy.state = "chase";
+    return;
+  }
+
   if (enemy.nextAction === "supporterPamphlet") {
     combat.spawnEnemyProjectile({
       x: enemy.x,
@@ -3532,6 +3708,29 @@ function finishWindup(enemy, player, combat, enemies = []) {
     enemy.specialCooldown = enemy.hp < enemy.maxHp * 0.5 ? randomRange(1.5, 2) : randomRange(2.1, 2.8);
     enemy.state = "chase";
   }
+}
+
+function updateDragonBoss(enemy, player, dt, combat) {
+  const dist = distance(enemy, player);
+  if (dist > 210) {
+    moveToward(enemy, player, dt, speedFor(enemy));
+  }
+
+  if (enemy.specialCooldown > 0) {
+    return;
+  }
+
+  const cycle = ["dragonBreath", "dragonFireball", "charge", "dragonBite"];
+  const action = cycle[enemy.phase % cycle.length];
+  enemy.phase += 1;
+  const label = {
+    dragonBreath: "Dragon Breath",
+    dragonFireball: "Fireball",
+    charge: "Charge",
+    dragonBite: "Bite"
+  }[action];
+  const windup = action === "charge" ? 0.44 : action === "dragonBite" ? 0.24 : 0.52;
+  startWindup(enemy, action, windup, combat, label);
 }
 
 function updateCharge(enemy, dt) {
@@ -3736,6 +3935,19 @@ function createMaterialDrop(material, amount, player, x, y) {
   };
 }
 
+function createGoldBar(x, y) {
+  return {
+    id: `gold-bar-${Math.random().toString(16).slice(2)}`,
+    type: "goldBar",
+    name: "Gold Bar",
+    x,
+    y,
+    radius: 25,
+    color: "#f2b85b",
+    bob: Math.random() * Math.PI * 2
+  };
+}
+
 function createShop(x, y) {
   return {
     id: `shop-${Math.random().toString(16).slice(2)}`,
@@ -3872,7 +4084,7 @@ function nearestInteractable(loot, player) {
     if ((item.type === "blueprint" || item.type === "material") && item.playerIndex !== player.playerIndex) {
       continue;
     }
-    const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;
+    const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" || item.type === "goldBar" ? 78 : 62;
     const bonusReach = player.passives?.has("magnetCharm") ? reach * 2 : reach;
     const dist = distance(item, player);
     if (dist <= bonusReach && dist < bestDistance) {
@@ -3957,8 +4169,15 @@ class Player {
         started: false,
         stage: null,
         progress: 0
+      },
+      kingdom: {
+        started: false,
+        stage: null,
+        complete: false
       }
     };
+    this.dragonHeart = false;
+    this.dragonFireBreath = false;
     this.inventoryMessage = "";
     this.isMoving = false;
     this.animationTime = 0;
@@ -4070,6 +4289,9 @@ class Player {
   }
 
   extraAbilityCooldownMax() {
+    if (this.extraAbilityId === "fireBreath") {
+      return 8.5;
+    }
     return this.character.classId === "swordsman" ? 7.5 : 6.5;
   }
 
@@ -4354,6 +4576,34 @@ class Player {
       });
       this.extraAbilityCooldown = this.extraAbilityCooldownMax();
       combat.floatText(target.x, target.y - 58, "Arrow Storm", this.character.accent);
+      return;
+    }
+
+    if (this.extraAbilityId === "fireBreath") {
+      const target = this.nearestEnemy();
+      const baseAngle = target ? angleTo(this, target) : Math.atan2(this.lastMove.y, this.lastMove.x);
+      this.facing = baseAngle;
+      for (let i = -4; i <= 4; i += 1) {
+        const angle = baseAngle + i * 0.11;
+        combat.spawnProjectile({
+          owner: this,
+          faction: "player",
+          x: this.x + Math.cos(angle) * 32,
+          y: this.y + Math.sin(angle) * 32,
+          angle,
+          speed: 700,
+          radius: 12,
+          damage: this.attackDamage() * 0.72,
+          life: 0.62,
+          color: "#ef7d57",
+          burn: {
+            duration: 3.2,
+            rate: 0.012
+          }
+        });
+      }
+      this.extraAbilityCooldown = this.extraAbilityCooldownMax();
+      combat.floatText(this.x, this.y - 58, "Fire Breath", "#ef7d57");
     }
   }
 
@@ -5153,6 +5403,20 @@ class Renderer {
       ctx.stroke();
     }
 
+    if (enemy.bossKind === "dragon") {
+      const shieldActive = (enemy.dragonShieldDown ?? 0) <= 0;
+      ctx.strokeStyle = shieldActive ? "#f2b85b" : "#73a9ff";
+      ctx.lineWidth = shieldActive ? 5 : 4;
+      ctx.beginPath();
+      ctx.arc(enemy.x, enemy.y, enemy.radius + 22, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = shieldActive ? "#f2b85b" : "#73a9ff";
+      ctx.font = "900 13px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(shieldActive ? "80% SHIELD" : "STUNNED", enemy.x, enemy.y - enemy.radius - 26);
+      ctx.textAlign = "start";
+    }
+
     if (enemy.state === "windup") {
       ctx.strokeStyle = "#f2b85b";
       ctx.lineWidth = 4;
@@ -5549,6 +5813,28 @@ class Renderer {
           ctx.font = "900 12px ui-sans-serif, system-ui";
           ctx.fillText(`x${item.amount}`, 0, 6);
         }
+        ctx.restore();
+        continue;
+      }
+
+      if (item.type === "goldBar") {
+        ctx.save();
+        ctx.translate(item.x, item.y + bob);
+        ctx.rotate(-0.22);
+        ctx.fillStyle = "rgba(0, 0, 0, 0.42)";
+        ctx.beginPath();
+        this.drawEllipse(ctx, 0, 23, 28, 8);
+        ctx.fill();
+
+        ctx.fillStyle = item.color;
+        ctx.strokeStyle = "#101317";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        this.drawRoundRect(ctx, -26, -12, 52, 24, 5);
+        ctx.fill();
+        ctx.stroke();
+        ctx.fillStyle = "rgba(246, 241, 232, 0.38)";
+        ctx.fillRect(-17, -6, 34, 4);
         ctx.restore();
         continue;
       }
@@ -6218,6 +6504,9 @@ class Renderer {
     if (item.type === "material") {
       return `${prefix}Press interact to pick up ${item.name ?? "material"}`;
     }
+    if (item.type === "goldBar") {
+      return `${prefix}Press interact to throw Gold Bar`;
+    }
     if (item.type === "sage") {
       return `${prefix}Press interact to deliver the message`;
     }
@@ -6680,6 +6969,7 @@ class Game {
     this.clearTimer = 0;
     this.crashed = false;
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
   }
 
   start(characterId = "mannequin", playerCount = 1) {
@@ -6698,6 +6988,7 @@ class Game {
     this.clearTimer = 0;
     this.crashed = false;
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
     this.running = true;
     this.ui.hideMenu();
     this.ui.hideGameOver();
@@ -6857,6 +7148,10 @@ class Game {
         player.score += defeated * (this.stage.isBoss ? 100 : 20);
       }
       for (const enemy of defeatedEnemies) {
+        if (enemy.bossKind === "dragon") {
+          this.completeKingdomRequest(enemy);
+          continue;
+        }
         this.dropEnemyEconomy(enemy);
         this.dropBossBlueprint(enemy);
         const potBonus = this.players.reduce((best, player) => Math.max(best, player.statBonuses.healthPotDrops), 0);
@@ -7148,6 +7443,13 @@ class Game {
       this.tryCompleteWeaponUpgrade(targetPlayer);
       this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
+      if (reward.id === "kingdomRequest") {
+        this.rewardChoices = null;
+        this.rewardChest = null;
+        this.rewardPicker = null;
+        this.startKingdomRequest(targetPlayer);
+        return;
+      }
       if (reward.opensChest) {
         this.rewardChoices = rollRewardOptions(targetPlayer, 3, reward.opensChest);
         this.rewardChest = {
@@ -7250,6 +7552,11 @@ class Game {
 
       if (target.type === "material") {
         this.collectMaterial(player, target);
+        return;
+      }
+
+      if (target.type === "goldBar") {
+        this.throwGoldBarAtDragon(player, target);
         return;
       }
 
@@ -7411,7 +7718,99 @@ class Game {
     this.combat.floatText(player.x, player.y - 68, "Sage's Footwork learned", "#f2b85b");
   }
 
-  returnFromHiddenQuest() {
+  startKingdomRequest(player) {
+    if (this.stage.isQuest || !player.questlines.kingdom?.started || player.questlines.kingdom.complete) {
+      return;
+    }
+    this.questReturn = {
+      stageNumber: this.stageNumber,
+      stage: this.stage,
+      enemies: this.enemies,
+      loot: this.loot,
+      roomCleared: this.roomCleared,
+      positions: this.players.map((candidate) => ({ x: candidate.x, y: candidate.y }))
+    };
+
+    this.stage = createDragonQuestStage();
+    this.enemies = [createDragonEnemy(this.stage)];
+    this.loot = this.createDragonGoldBars();
+    this.rewardChoices = null;
+    this.rewardChest = null;
+    this.rewardPicker = null;
+    this.roomCleared = false;
+    this.kingdomQuestPlayerIndex = player.playerIndex;
+    this.combat.reset();
+
+    this.players.forEach((candidate, index) => {
+      candidate.x = this.stage.dragon.playerStart.x + (this.players.length === 2 ? (index === 0 ? -34 : 34) : 0);
+      candidate.y = this.stage.dragon.playerStart.y;
+      candidate.game = this;
+      if (candidate === player) {
+        candidate.questlines.kingdom.stage = "dragon";
+      }
+    });
+    this.player = player;
+    this.updateCamera();
+    this.combat.floatText(player.x, player.y - 72, "The Kingdom's Request", "#f2b85b");
+    this.combat.floatText(player.x, player.y - 50, "Throw gold bars to break the dragon shield", "#afa89e");
+  }
+
+  createDragonGoldBars() {
+    const center = this.stage.dragon.spawn;
+    const bars = [];
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const radius = i % 2 === 0 ? 300 : 440;
+      bars.push(createGoldBar(
+        center.x + Math.cos(angle) * radius,
+        center.y + Math.sin(angle) * radius
+      ));
+    }
+    return bars;
+  }
+
+  throwGoldBarAtDragon(player, target) {
+    const dragon = this.enemies.find((enemy) => enemy.bossKind === "dragon" && enemy.hp > 0);
+    if (!dragon) {
+      return;
+    }
+    this.loot = this.loot.filter((item) => item.id !== target.id);
+    dragon.frozen = Math.max(dragon.frozen ?? 0, 2);
+    dragon.dragonShieldDown = Math.max(dragon.dragonShieldDown ?? 0, 2);
+    dragon.state = "chase";
+    dragon.specialCooldown = Math.max(dragon.specialCooldown ?? 0, 1.2);
+    this.combat.screenShake = Math.max(this.combat.screenShake, 12);
+    this.combat.floatText(dragon.x, dragon.y - dragon.radius - 26, "Shield broken", "#f2b85b");
+    this.combat.floatText(player.x, player.y - 58, "Gold bar thrown", "#f2b85b");
+  }
+
+  completeKingdomRequest(enemy) {
+    const player = this.players[this.kingdomQuestPlayerIndex] ?? this.player;
+    let grantedDragonHeart = false;
+    if (player) {
+      player.questlines.kingdom = {
+        started: true,
+        stage: "complete",
+        complete: true
+      };
+      if (!player.dragonHeart) {
+        player.dragonHeart = true;
+        player.dragonFireBreath = true;
+        player.extraAbilityId = "fireBreath";
+        const hpGain = Math.ceil(player.maxHp * 2);
+        player.maxHp += hpGain;
+        player.hp += hpGain;
+        grantedDragonHeart = true;
+      }
+    }
+    this.returnFromQuest();
+    if (player) {
+      this.combat.floatText(player.x, player.y - 88, grantedDragonHeart ? "Dragon Heart claimed" : "Dragon defeated", "#f2b85b");
+      this.combat.floatText(player.x, player.y - 66, "Fire Breath unlocked", "#ef7d57");
+    }
+  }
+
+  returnFromQuest() {
     if (!this.questReturn) {
       return;
     }
@@ -7429,8 +7828,13 @@ class Game {
     });
     this.player = this.players[0];
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
     this.combat.reset();
     this.updateCamera();
+  }
+
+  returnFromHiddenQuest() {
+    this.returnFromQuest();
   }
 
   updateCamera() {

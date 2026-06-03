@@ -83,6 +83,19 @@ export function createMaterialDrop(material, amount, player, x, y) {
   };
 }
 
+export function createGoldBar(x, y) {
+  return {
+    id: `gold-bar-${Math.random().toString(16).slice(2)}`,
+    type: "goldBar",
+    name: "Gold Bar",
+    x,
+    y,
+    radius: 25,
+    color: "#f2b85b",
+    bob: Math.random() * Math.PI * 2
+  };
+}
+
 export function createShop(x, y) {
   return {
     id: `shop-${Math.random().toString(16).slice(2)}`,
@@ -219,7 +232,7 @@ export function nearestInteractable(loot, player) {
     if ((item.type === "blueprint" || item.type === "material") && item.playerIndex !== player.playerIndex) {
       continue;
     }
-    const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" ? 78 : 62;
+    const reach = item.type === "portal" || item.type === "questPortal" || item.type === "lobbyPortal" ? 86 : item.type === "shop" || item.type === "sage" || item.type === "lobbyCharacter" || item.type === "lobbySpot" || item.type === "goldBar" ? 78 : 62;
     const bonusReach = player.passives?.has("magnetCharm") ? reach * 2 : reach;
     const dist = distance(item, player);
     if (dist <= bonusReach && dist < bestDistance) {

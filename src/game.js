@@ -1,11 +1,11 @@
 import { getCharacter, mannequinCharacter } from "./data/characters.js";
 import { weapons } from "./data/weapons.js";
 import { applyReward, canApplyReward, completeWeaponUpgrade, rollRewardOptions, rollShopOptions, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
-import { createHiddenQuestStage, createLobbyStage, createStage } from "./data/stages.js";
+import { createDragonQuestStage, createHiddenQuestStage, createLobbyStage, createStage } from "./data/stages.js";
 import { Player } from "./player.js";
-import { createEnemies, updateEnemies } from "./enemies.js";
+import { createDragonEnemy, createEnemies, updateEnemies } from "./enemies.js";
 import { CombatSystem } from "./combat.js";
-import { createBlueprintDrop, createHealthPotion, createLobbyCharacter, createLobbyPortal, createLobbySpot, createMaterialDrop, createQuestPortal, createSage, nearestInteractable, spawnRewardLoot } from "./loot.js";
+import { createBlueprintDrop, createGoldBar, createHealthPotion, createLobbyCharacter, createLobbyPortal, createLobbySpot, createMaterialDrop, createQuestPortal, createSage, nearestInteractable, spawnRewardLoot } from "./loot.js";
 import { clamp } from "./utils/math.js";
 
 export class Game {
@@ -31,6 +31,7 @@ export class Game {
     this.clearTimer = 0;
     this.crashed = false;
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
   }
 
   start(characterId = "mannequin", playerCount = 1) {
@@ -49,6 +50,7 @@ export class Game {
     this.clearTimer = 0;
     this.crashed = false;
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
     this.running = true;
     this.ui.hideMenu();
     this.ui.hideGameOver();
@@ -208,6 +210,10 @@ export class Game {
         player.score += defeated * (this.stage.isBoss ? 100 : 20);
       }
       for (const enemy of defeatedEnemies) {
+        if (enemy.bossKind === "dragon") {
+          this.completeKingdomRequest(enemy);
+          continue;
+        }
         this.dropEnemyEconomy(enemy);
         this.dropBossBlueprint(enemy);
         const potBonus = this.players.reduce((best, player) => Math.max(best, player.statBonuses.healthPotDrops), 0);
@@ -499,6 +505,13 @@ export class Game {
       this.tryCompleteWeaponUpgrade(targetPlayer);
       this.rewardChest.stock = (this.rewardChest.stock ?? this.rewardChoices).filter((item, stockIndex) => stockIndex !== index && item.id !== reward.id);
       this.combat.floatText(targetPlayer.x, targetPlayer.y - 62, `${reward.name} bought`, "#f2b85b");
+      if (reward.id === "kingdomRequest") {
+        this.rewardChoices = null;
+        this.rewardChest = null;
+        this.rewardPicker = null;
+        this.startKingdomRequest(targetPlayer);
+        return;
+      }
       if (reward.opensChest) {
         this.rewardChoices = rollRewardOptions(targetPlayer, 3, reward.opensChest);
         this.rewardChest = {
@@ -601,6 +614,11 @@ export class Game {
 
       if (target.type === "material") {
         this.collectMaterial(player, target);
+        return;
+      }
+
+      if (target.type === "goldBar") {
+        this.throwGoldBarAtDragon(player, target);
         return;
       }
 
@@ -762,7 +780,99 @@ export class Game {
     this.combat.floatText(player.x, player.y - 68, "Sage's Footwork learned", "#f2b85b");
   }
 
-  returnFromHiddenQuest() {
+  startKingdomRequest(player) {
+    if (this.stage.isQuest || !player.questlines.kingdom?.started || player.questlines.kingdom.complete) {
+      return;
+    }
+    this.questReturn = {
+      stageNumber: this.stageNumber,
+      stage: this.stage,
+      enemies: this.enemies,
+      loot: this.loot,
+      roomCleared: this.roomCleared,
+      positions: this.players.map((candidate) => ({ x: candidate.x, y: candidate.y }))
+    };
+
+    this.stage = createDragonQuestStage();
+    this.enemies = [createDragonEnemy(this.stage)];
+    this.loot = this.createDragonGoldBars();
+    this.rewardChoices = null;
+    this.rewardChest = null;
+    this.rewardPicker = null;
+    this.roomCleared = false;
+    this.kingdomQuestPlayerIndex = player.playerIndex;
+    this.combat.reset();
+
+    this.players.forEach((candidate, index) => {
+      candidate.x = this.stage.dragon.playerStart.x + (this.players.length === 2 ? (index === 0 ? -34 : 34) : 0);
+      candidate.y = this.stage.dragon.playerStart.y;
+      candidate.game = this;
+      if (candidate === player) {
+        candidate.questlines.kingdom.stage = "dragon";
+      }
+    });
+    this.player = player;
+    this.updateCamera();
+    this.combat.floatText(player.x, player.y - 72, "The Kingdom's Request", "#f2b85b");
+    this.combat.floatText(player.x, player.y - 50, "Throw gold bars to break the dragon shield", "#afa89e");
+  }
+
+  createDragonGoldBars() {
+    const center = this.stage.dragon.spawn;
+    const bars = [];
+    for (let i = 0; i < 8; i += 1) {
+      const angle = (Math.PI * 2 * i) / 8;
+      const radius = i % 2 === 0 ? 300 : 440;
+      bars.push(createGoldBar(
+        center.x + Math.cos(angle) * radius,
+        center.y + Math.sin(angle) * radius
+      ));
+    }
+    return bars;
+  }
+
+  throwGoldBarAtDragon(player, target) {
+    const dragon = this.enemies.find((enemy) => enemy.bossKind === "dragon" && enemy.hp > 0);
+    if (!dragon) {
+      return;
+    }
+    this.loot = this.loot.filter((item) => item.id !== target.id);
+    dragon.frozen = Math.max(dragon.frozen ?? 0, 2);
+    dragon.dragonShieldDown = Math.max(dragon.dragonShieldDown ?? 0, 2);
+    dragon.state = "chase";
+    dragon.specialCooldown = Math.max(dragon.specialCooldown ?? 0, 1.2);
+    this.combat.screenShake = Math.max(this.combat.screenShake, 12);
+    this.combat.floatText(dragon.x, dragon.y - dragon.radius - 26, "Shield broken", "#f2b85b");
+    this.combat.floatText(player.x, player.y - 58, "Gold bar thrown", "#f2b85b");
+  }
+
+  completeKingdomRequest(enemy) {
+    const player = this.players[this.kingdomQuestPlayerIndex] ?? this.player;
+    let grantedDragonHeart = false;
+    if (player) {
+      player.questlines.kingdom = {
+        started: true,
+        stage: "complete",
+        complete: true
+      };
+      if (!player.dragonHeart) {
+        player.dragonHeart = true;
+        player.dragonFireBreath = true;
+        player.extraAbilityId = "fireBreath";
+        const hpGain = Math.ceil(player.maxHp * 2);
+        player.maxHp += hpGain;
+        player.hp += hpGain;
+        grantedDragonHeart = true;
+      }
+    }
+    this.returnFromQuest();
+    if (player) {
+      this.combat.floatText(player.x, player.y - 88, grantedDragonHeart ? "Dragon Heart claimed" : "Dragon defeated", "#f2b85b");
+      this.combat.floatText(player.x, player.y - 66, "Fire Breath unlocked", "#ef7d57");
+    }
+  }
+
+  returnFromQuest() {
     if (!this.questReturn) {
       return;
     }
@@ -780,8 +890,13 @@ export class Game {
     });
     this.player = this.players[0];
     this.questReturn = null;
+    this.kingdomQuestPlayerIndex = null;
     this.combat.reset();
     this.updateCamera();
+  }
+
+  returnFromHiddenQuest() {
+    this.returnFromQuest();
   }
 
   updateCamera() {

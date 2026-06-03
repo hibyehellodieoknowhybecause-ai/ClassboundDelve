@@ -112,6 +112,12 @@ export class CombatSystem {
               rate: projectile.bleed.rate
             };
           }
+          if (projectile.burn) {
+            enemy.burning = {
+              timer: projectile.burn.duration,
+              rate: projectile.burn.rate
+            };
+          }
           this.floatText(enemy.x, enemy.y - enemy.radius, Math.round(projectile.damage).toString(), projectile.color);
           projectile.life = 0;
           this.spawnProjectileEndPatch(projectile);
@@ -313,6 +319,11 @@ export class CombatSystem {
           labelOnHit: "Pamphlets!"
         });
       }
+      return;
+    }
+    if (enemy.bossKind === "dragon" && (enemy.dragonShieldDown ?? 0) <= 0) {
+      damageEnemy(enemy, damage * 0.2, source, knockback * 0.25);
+      this.floatText(enemy.x, enemy.y - enemy.radius - 20, "Dragon Shield", "#f2b85b");
       return;
     }
     damageEnemy(enemy, damage, source, knockback);

@@ -65,6 +65,10 @@ http://localhost:4173
   - The hidden quest teleports players into a dark maze to deliver a message to the Maze Sage.
   - Players can only see a short distance in the maze, but they leave torchlight every two maze blocks.
   - Delivering the message grants Sage's Footwork: after dashing, the next basic attack deals +30% damage.
+  - The Kingdom's Request can appear in shops for 1500 coins with a 10% stock chance.
+  - Buying it teleports the player to a simple dragon arena.
+  - Gold Bars in the arena must be picked up and thrown to stun the dragon and temporarily remove its 80% damage shield.
+  - Killing the dragon grants Dragon Heart, +200% max HP, and the Fire Breath extra ability.
   - Pick one reward with mouse, `1`, `2`, or `3`.
   - Rewards can be stat upgrades, passives, ability evolutions, new ability effects, or pets.
   - Class evolution rewards unlock an extra class ability.
