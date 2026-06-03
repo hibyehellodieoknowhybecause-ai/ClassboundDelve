@@ -19,9 +19,11 @@ export class UI {
       closeSettings: document.querySelector("#closeSettings"),
       controlsTab: document.querySelector("#controlsTab"),
       upgradesTab: document.querySelector("#upgradesTab"),
+      itemsTab: document.querySelector("#itemsTab"),
       secretCodesTab: document.querySelector("#secretCodesTab"),
       controlsPanel: document.querySelector("#controlsPanel"),
       upgradesPanel: document.querySelector("#upgradesPanel"),
+      itemsPanel: document.querySelector("#itemsPanel"),
       secretCodesPanel: document.querySelector("#secretCodesPanel"),
       keybindRows: document.querySelector("#keybindRows"),
       upgradeRows: document.querySelector("#upgradeRows"),
@@ -29,6 +31,7 @@ export class UI {
       upgradeDetailName: document.querySelector("#upgradeDetailName"),
       upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
       upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
+      itemRows: document.querySelector("#itemRows"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
       saveSettings: document.querySelector("#saveSettings"),
       secretCodeForm: document.querySelector("#secretCodeForm"),
@@ -56,6 +59,7 @@ export class UI {
     this.elements.closeSettings.addEventListener("click", () => this.hideSettings());
     this.elements.controlsTab.addEventListener("click", () => this.showSettingsTab("controls"));
     this.elements.upgradesTab.addEventListener("click", () => this.showSettingsTab("upgrades"));
+    this.elements.itemsTab.addEventListener("click", () => this.showSettingsTab("items"));
     this.elements.secretCodesTab.addEventListener("click", () => this.showSettingsTab("secretCodes"));
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
@@ -152,15 +156,21 @@ export class UI {
   showSettingsTab(tab) {
     const controlsActive = tab === "controls";
     const upgradesActive = tab === "upgrades";
+    const itemsActive = tab === "items";
     const secretActive = tab === "secretCodes";
     this.elements.controlsTab.classList.toggle("active", controlsActive);
     this.elements.upgradesTab.classList.toggle("active", upgradesActive);
+    this.elements.itemsTab.classList.toggle("active", itemsActive);
     this.elements.secretCodesTab.classList.toggle("active", secretActive);
     this.elements.controlsPanel.classList.toggle("hidden", !controlsActive);
     this.elements.upgradesPanel.classList.toggle("hidden", !upgradesActive);
+    this.elements.itemsPanel.classList.toggle("hidden", !itemsActive);
     this.elements.secretCodesPanel.classList.toggle("hidden", !secretActive);
     if (upgradesActive) {
       this.renderUpgrades();
+    }
+    if (itemsActive) {
+      this.renderItems();
     }
   }
 
@@ -219,9 +229,15 @@ export class UI {
     for (const id of player.rewardHistory ?? []) {
       counts.set(id, (counts.get(id) ?? 0) + 1);
     }
+    if (player.passives?.has("sageDashStrike")) {
+      counts.set("questSageFootwork", 1);
+    }
+    if (player.dragonFireBreath) {
+      counts.set("questFireBreath", 1);
+    }
 
     return [...counts.entries()]
-      .map(([id, count]) => ({ ...rewardInfoFor(id), count, group: player.label ?? "Player" }))
+      .map(([id, count]) => ({ ...this.upgradeInfoFor(id), count, group: player.label ?? "Player" }))
       .filter((entry) => entry.id && upgradeTypes.has(entry.type))
       .sort((a, b) => {
         const rarityDelta = rarityOrder.indexOf(a.rarity) - rarityOrder.indexOf(b.rarity);
@@ -230,6 +246,92 @@ export class UI {
         }
         return a.name.localeCompare(b.name);
       });
+  }
+
+  upgradeInfoFor(id) {
+    const questUpgrades = {
+      questSageFootwork: {
+        id: "questSageFootwork",
+        name: "Sage's Footwork",
+        type: "Passive",
+        rarity: "rare",
+        description: "After dashing, your next attack deals +30% damage for 1 second."
+      },
+      questFireBreath: {
+        id: "questFireBreath",
+        name: "Fire Breath",
+        type: "Ability",
+        rarity: "legendary",
+        description: "Dragon Heart reward. Unlocks Fire Breath, applies burn, and grants +200% max HP."
+      }
+    };
+    return questUpgrades[id] ?? rewardInfoFor(id);
+  }
+
+  renderItems() {
+    const rows = this.elements.itemRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.itemEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">No items yet.</div>`;
+      return;
+    }
+
+    let currentGroup = "";
+    for (const entry of entries) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.innerHTML = `
+        <span>
+          <span class="item-name">${entry.name}</span>
+          <span class="item-description">${entry.description}</span>
+        </span>
+        <span class="item-value">${entry.value}</span>
+      `;
+      rows.appendChild(row);
+    }
+  }
+
+  itemEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+
+    const group = player.label ?? "Player";
+    const entries = [
+      { group, name: "Coins", value: player.gold ?? 0, description: "Spendable shop currency." },
+      { group, name: "Weapon Ore", value: player.materials?.weapon ?? 0, description: "Used for weapon evolution." },
+      { group, name: "Tempered Core", value: player.materials?.weaponCore ?? 0, description: "Rare weapon evolution material." },
+      { group, name: "Hero Sigil", value: player.materials?.hero ?? 0, description: "Hero ascension material." }
+    ];
+
+    if (player.blueprints?.weaponEvolution) {
+      entries.push({ group, name: "Weapon Evolution Blueprint", value: player.weaponEvolution?.completed ? "Complete" : "Owned", description: "Allows weapon evolution crafting." });
+    }
+    if (player.blueprints?.heroAscension) {
+      entries.push({ group, name: "Hero Ascension Blueprint", value: "Owned", description: "Unlocks future hero ascension crafting." });
+    }
+    if (player.dragonHeart) {
+      entries.push({ group, name: "Dragon Heart", value: "Owned", description: "Kingdom quest reward. Powers Fire Breath and the huge max HP gain." });
+    }
+    if (player.questlines?.hidden?.started) {
+      entries.push({ group, name: "Sealed Errand", value: player.questlines.hidden.stage ?? "Started", description: "Hidden maze quest progress." });
+    }
+    if (player.questlines?.kingdom?.started) {
+      entries.push({ group, name: "The Kingdom's Request", value: player.questlines.kingdom.complete ? "Complete" : player.questlines.kingdom.stage ?? "Started", description: "Dragon quest progress." });
+    }
+
+    return entries;
   }
 
   showUpgradeDetail(entry) {
@@ -326,6 +428,7 @@ export class UI {
     this.pendingKeybinds = { ...this.input.keybinds };
     this.renderKeybinds();
     this.renderUpgrades();
+    this.renderItems();
     this.showSettingsTab("controls");
     this.elements.settings.classList.remove("hidden");
   }

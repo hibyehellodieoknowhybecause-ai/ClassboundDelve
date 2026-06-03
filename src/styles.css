@@ -261,6 +261,7 @@ h2 {
 
 .settings-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 18px;
   border-bottom: 1px solid var(--line);
@@ -508,6 +509,51 @@ input:focus {
   background: rgba(255, 255, 255, 0.04);
 }
 
+.item-list {
+  display: grid;
+  gap: 8px;
+}
+
+.item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 58px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.item-name,
+.item-description,
+.item-value {
+  display: block;
+}
+
+.item-name {
+  font-weight: 900;
+}
+
+.item-description {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.item-value {
+  flex: 0 0 auto;
+  min-width: 76px;
+  border: 1px solid rgba(242, 184, 91, 0.5);
+  border-radius: 999px;
+  padding: 5px 10px;
+  color: var(--gold);
+  background: rgba(0, 0, 0, 0.22);
+  text-align: center;
+  font-weight: 900;
+}
+
 .touch-controls {
   position: absolute;
   inset: 0;
@@ -624,7 +670,16 @@ input:focus {
   .menu-actions button,
   .settings-actions button,
   .tab-button {
-    width: 100%;
+    flex: 1 1 140px;
+  }
+
+  .item-row {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .item-value {
+    min-width: 0;
   }
 
   .lobby-preview {
