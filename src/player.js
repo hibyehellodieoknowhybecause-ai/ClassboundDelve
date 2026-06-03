@@ -703,9 +703,7 @@ export class Player {
 
     for (let i = 0; i < this.pets.length; i += 1) {
       const pet = this.pets[i];
-      pet.angle += dt * (1.7 + i * 0.18);
-      pet.x = this.x + Math.cos(pet.angle + i * 2.1) * 48;
-      pet.y = this.y + Math.sin(pet.angle + i * 2.1) * 34;
+      this.updatePetMovement(pet, i, dt);
       pet.cooldown = Math.max(0, pet.cooldown - dt);
       if (pet.fairyAuraCooldown !== undefined) {
         pet.fairyAuraCooldown = Math.max(0, pet.fairyAuraCooldown - dt);
@@ -774,6 +772,73 @@ export class Player {
     }
   }
 
+  updatePetMovement(pet, index, dt) {
+    pet.angle += dt * (1.7 + index * 0.18);
+
+    if (!pet.freeMove) {
+      pet.x = this.x + Math.cos(pet.angle + index * 2.1) * 48;
+      pet.y = this.y + Math.sin(pet.angle + index * 2.1) * 34;
+      return;
+    }
+
+    if (pet.x === undefined || pet.y === undefined) {
+      pet.x = this.x + Math.cos(pet.angle + index) * 58;
+      pet.y = this.y + Math.sin(pet.angle + index) * 44;
+      pet.roamAngle = pet.angle;
+      pet.roamTimer = 0;
+    }
+
+    const target = this.petMoveTarget(pet);
+    const desiredDistance = target.enemy ? 145 : 56 + (index % 4) * 18;
+    const currentDistance = distance(pet, target);
+    const shouldMove = target.enemy ? currentDistance > desiredDistance : currentDistance > desiredDistance + 18;
+    if (shouldMove) {
+      const dir = normalize(target.x - pet.x, target.y - pet.y);
+      const speed = pet.bodyguard ? 255 : pet.id === "epicBird" || pet.id === "mythicalFairy" ? 285 : pet.id === "epicTortoise" ? 190 : 235;
+      pet.x += dir.x * speed * dt;
+      pet.y += dir.y * speed * dt;
+      pet.facing = Math.atan2(dir.y, dir.x);
+      this.keepPetInRoom(pet);
+      return;
+    }
+
+    pet.roamTimer = Math.max(0, (pet.roamTimer ?? 0) - dt);
+    if (pet.roamTimer <= 0) {
+      pet.roamAngle = Math.random() * Math.PI * 2;
+      pet.roamTimer = 0.8 + Math.random() * 1.2;
+    }
+    const driftSpeed = target.enemy ? 38 : 24;
+    pet.x += Math.cos(pet.roamAngle) * driftSpeed * dt;
+    pet.y += Math.sin(pet.roamAngle) * driftSpeed * dt;
+    this.keepPetInRoom(pet);
+  }
+
+  petMoveTarget(pet) {
+    const enemy = this.game?.enemies
+      ?.filter((candidate) => candidate.hp > 0 && distance(pet, candidate) < 620)
+      .sort((a, b) => distance(pet, a) - distance(pet, b))[0];
+    if (enemy) {
+      return { ...enemy, enemy: true };
+    }
+
+    const homeAngle = (pet.angle ?? 0) + (pet.bodyguard ? 1.6 : 0);
+    return {
+      x: this.x + Math.cos(homeAngle) * 70,
+      y: this.y + Math.sin(homeAngle) * 48,
+      enemy: false
+    };
+  }
+
+  keepPetInRoom(pet) {
+    const room = this.game?.stage?.room;
+    if (!room) {
+      return;
+    }
+    const radius = 16;
+    pet.x = clamp(pet.x, room.margin + radius, room.width - room.margin - radius);
+    pet.y = clamp(pet.y, room.margin + radius, room.height - room.margin - radius);
+  }
+
   petDamage(pet) {
     if (pet.bodyguard) {
       return this.attackDamage() * (pet.damageRatio ?? 0.3) * (1 + this.statBonuses.petDamage + (this.petDamageBoost > 0 ? 0.6 : 0));
@@ -811,6 +876,7 @@ export class Player {
         id: `bodyguard-${i}`,
         name: "Bodyguard",
         bodyguard: true,
+        freeMove: true,
         angle: (Math.PI * 2 * i) / count,
         cooldown: 0.2 + i * 0.08,
         cooldownMax: 0.95,
