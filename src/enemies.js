@@ -776,7 +776,8 @@ function startWindup(enemy, nextAction, duration, combat, label) {
   enemy.state = "windup";
   enemy.nextAction = nextAction;
   enemy.stateTimer = duration;
-  combat.floatText(enemy.x, enemy.y - enemy.radius, label, "#f2b85b");
+  enemy.spriteAction = enemy.bossKind === "elon" ? nextAction : enemy.spriteAction;
+  combat.floatText(enemy.x, enemy.y - (enemy.bossKind === "elon" ? 120 : enemy.radius), label, "#f2b85b");
 
   if (enemy.bossKind === "broadcaster" && broadcasterDialogue[nextAction]) {
     combat.speak(enemy, pickLine(broadcasterDialogue[nextAction]), {
@@ -790,19 +791,20 @@ function startWindup(enemy, nextAction, duration, combat, label) {
     combat.speak(enemy, pickLine(elonDialogue[nextAction]), {
       accent: nextAction === "flamethrower" || nextAction === "starship" ? "#ef7d57" : "#73a9ff",
       duration: nextAction === "starship" ? 2.35 : 1.8,
-      offsetY: -enemy.radius - 72
+      offsetY: -170
     });
   }
 }
 
 function finishWindup(enemy, player, combat, enemies = [], room = null) {
   if (enemy.nextAction === "xPost") {
-    const direction = player.x >= enemy.x ? 0 : Math.PI;
+    const baseAngle = angleTo(enemy, player);
     for (let i = -2; i <= 2; i += 1) {
+      const angle = baseAngle + i * 0.13;
       combat.spawnEnemyProjectile({
-        x: enemy.x + Math.cos(direction) * 40,
-        y: enemy.y + i * 22,
-        angle: direction,
+        x: enemy.x + Math.cos(angle) * 40,
+        y: enemy.y + Math.sin(angle) * 40,
+        angle,
         speed: 760 + Math.abs(i) * 35,
         damage: consumeMarketDamage(enemy, enemy.damage * 0.46),
         radius: i === 0 ? 16 : 13,
@@ -1155,13 +1157,21 @@ function updateDragonBoss(enemy, player, dt, combat) {
 
 function updateElonBoss(enemy, player, dt, combat, room) {
   const dist = distance(enemy, player);
+  const restingAction = dist > 280 && enemy.podTimer <= 0 ? "walk" : "idle";
   if (dist > 280 && enemy.podTimer <= 0) {
     moveToward(enemy, player, dt, speedFor(enemy));
   }
 
   if (enemy.specialCooldown > 0 || enemy.podTimer > 0) {
+    if (enemy.podTimer > 0) {
+      enemy.spriteAction = "starship";
+    } else if (enemy.state !== "windup") {
+      enemy.spriteAction = restingAction;
+    }
     return;
   }
+
+  enemy.spriteAction = restingAction;
 
   const cycle = ["xPost", "autopilot", "flamethrower", "doge", "xPost", "starship"];
   const action = cycle[enemy.phase % cycle.length];

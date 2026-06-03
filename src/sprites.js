@@ -45,14 +45,19 @@ export const spriteSheets = {
   },
   bossElon: {
     src: "./assets/sprites/elon_boss.png",
-    frameWidth: 97,
-    frameHeight: 220,
-    drawWidth: 86,
-    drawHeight: 196,
+    frameWidth: 112,
+    frameHeight: 232,
+    drawWidth: 96,
+    drawHeight: 199,
     animations: {
-      idle: { row: 0, frames: 1, fps: 1 },
-      walk: { row: 0, frames: 1, fps: 1 },
-      attack: { row: 0, frames: 1, fps: 1 }
+      idle: { row: 0, frames: 4, fps: 5 },
+      walk: { row: 1, frames: 4, fps: 8 },
+      xPost: { row: 2, frames: 4, fps: 12 },
+      autopilot: { row: 3, frames: 4, fps: 10 },
+      flamethrower: { row: 4, frames: 4, fps: 12 },
+      doge: { row: 5, frames: 4, fps: 11 },
+      starship: { row: 6, frames: 4, fps: 10 },
+      attack: { row: 2, frames: 4, fps: 12 }
     }
   }
 };

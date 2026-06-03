@@ -595,6 +595,13 @@ export class Renderer {
       if (enemy.nextAction === "table") return "table";
       if (enemy.nextAction === "phone") return "phone";
       if (enemy.nextAction === "liveStream") return "liveStream";
+      if (enemy.bossKind === "elon") {
+        if (enemy.nextAction === "xPost") return "xPost";
+        if (enemy.nextAction === "autopilot") return "autopilot";
+        if (enemy.nextAction === "flamethrower") return "flamethrower";
+        if (enemy.nextAction === "doge") return "doge";
+        if (enemy.nextAction === "starship") return "starship";
+      }
     }
     if (enemy.shieldTimer > 0) return "table";
     if (enemy.spriteAction && enemy.spriteAction !== "idle") return enemy.spriteAction;

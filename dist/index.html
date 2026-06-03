@@ -2762,14 +2762,19 @@ const spriteSheets = {
   },
   bossElon: {
     src: "./assets/sprites/elon_boss.png",
-    frameWidth: 97,
-    frameHeight: 220,
-    drawWidth: 86,
-    drawHeight: 196,
+    frameWidth: 112,
+    frameHeight: 232,
+    drawWidth: 96,
+    drawHeight: 199,
     animations: {
-      idle: { row: 0, frames: 1, fps: 1 },
-      walk: { row: 0, frames: 1, fps: 1 },
-      attack: { row: 0, frames: 1, fps: 1 }
+      idle: { row: 0, frames: 4, fps: 5 },
+      walk: { row: 1, frames: 4, fps: 8 },
+      xPost: { row: 2, frames: 4, fps: 12 },
+      autopilot: { row: 3, frames: 4, fps: 10 },
+      flamethrower: { row: 4, frames: 4, fps: 12 },
+      doge: { row: 5, frames: 4, fps: 11 },
+      starship: { row: 6, frames: 4, fps: 10 },
+      attack: { row: 2, frames: 4, fps: 12 }
     }
   }
 };
@@ -4043,7 +4048,8 @@ function startWindup(enemy, nextAction, duration, combat, label) {
   enemy.state = "windup";
   enemy.nextAction = nextAction;
   enemy.stateTimer = duration;
-  combat.floatText(enemy.x, enemy.y - enemy.radius, label, "#f2b85b");
+  enemy.spriteAction = enemy.bossKind === "elon" ? nextAction : enemy.spriteAction;
+  combat.floatText(enemy.x, enemy.y - (enemy.bossKind === "elon" ? 120 : enemy.radius), label, "#f2b85b");
 
   if (enemy.bossKind === "broadcaster" && broadcasterDialogue[nextAction]) {
     combat.speak(enemy, pickLine(broadcasterDialogue[nextAction]), {
@@ -4057,19 +4063,20 @@ function startWindup(enemy, nextAction, duration, combat, label) {
     combat.speak(enemy, pickLine(elonDialogue[nextAction]), {
       accent: nextAction === "flamethrower" || nextAction === "starship" ? "#ef7d57" : "#73a9ff",
       duration: nextAction === "starship" ? 2.35 : 1.8,
-      offsetY: -enemy.radius - 72
+      offsetY: -170
     });
   }
 }
 
 function finishWindup(enemy, player, combat, enemies = [], room = null) {
   if (enemy.nextAction === "xPost") {
-    const direction = player.x >= enemy.x ? 0 : Math.PI;
+    const baseAngle = angleTo(enemy, player);
     for (let i = -2; i <= 2; i += 1) {
+      const angle = baseAngle + i * 0.13;
       combat.spawnEnemyProjectile({
-        x: enemy.x + Math.cos(direction) * 40,
-        y: enemy.y + i * 22,
-        angle: direction,
+        x: enemy.x + Math.cos(angle) * 40,
+        y: enemy.y + Math.sin(angle) * 40,
+        angle,
         speed: 760 + Math.abs(i) * 35,
         damage: consumeMarketDamage(enemy, enemy.damage * 0.46),
         radius: i === 0 ? 16 : 13,
@@ -4422,13 +4429,21 @@ function updateDragonBoss(enemy, player, dt, combat) {
 
 function updateElonBoss(enemy, player, dt, combat, room) {
   const dist = distance(enemy, player);
+  const restingAction = dist > 280 && enemy.podTimer <= 0 ? "walk" : "idle";
   if (dist > 280 && enemy.podTimer <= 0) {
     moveToward(enemy, player, dt, speedFor(enemy));
   }
 
   if (enemy.specialCooldown > 0 || enemy.podTimer > 0) {
+    if (enemy.podTimer > 0) {
+      enemy.spriteAction = "starship";
+    } else if (enemy.state !== "windup") {
+      enemy.spriteAction = restingAction;
+    }
     return;
   }
+
+  enemy.spriteAction = restingAction;
 
   const cycle = ["xPost", "autopilot", "flamethrower", "doge", "xPost", "starship"];
   const action = cycle[enemy.phase % cycle.length];
@@ -6615,6 +6630,13 @@ class Renderer {
       if (enemy.nextAction === "table") return "table";
       if (enemy.nextAction === "phone") return "phone";
       if (enemy.nextAction === "liveStream") return "liveStream";
+      if (enemy.bossKind === "elon") {
+        if (enemy.nextAction === "xPost") return "xPost";
+        if (enemy.nextAction === "autopilot") return "autopilot";
+        if (enemy.nextAction === "flamethrower") return "flamethrower";
+        if (enemy.nextAction === "doge") return "doge";
+        if (enemy.nextAction === "starship") return "starship";
+      }
     }
     if (enemy.shieldTimer > 0) return "table";
     if (enemy.spriteAction && enemy.spriteAction !== "idle") return enemy.spriteAction;
