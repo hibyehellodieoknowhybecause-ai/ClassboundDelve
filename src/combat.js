@@ -326,6 +326,11 @@ export class CombatSystem {
       this.floatText(enemy.x, enemy.y - enemy.radius - 20, "Dragon Shield", "#f2b85b");
       return;
     }
+    if (enemy.bossKind === "elon" && (enemy.marketDefenseTimer ?? 0) > 0) {
+      damageEnemy(enemy, damage * 0.7, source, knockback * 0.6);
+      this.floatText(enemy.x, enemy.y - enemy.radius - 18, "Market Defense", "#d95757");
+      return;
+    }
     damageEnemy(enemy, damage, source, knockback);
   }
 }

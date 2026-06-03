@@ -27,6 +27,34 @@ const broadcasterDialogue = {
   ]
 };
 
+const elonDialogue = {
+  xPost: [
+    "Who controls the memes, controls the Universe.",
+    "The social media AI algorithms are basically dopamine maximizers.",
+    "Let that sink in."
+  ],
+  autopilot: [
+    "Defeating traffic is the ultimate boss battle.",
+    "Even the most powerful humans in the world cannot defeat traffic.",
+    "You want your net useful output to be maximized."
+  ],
+  flamethrower: [
+    "Apparently, we are renaming it Not a Flamethrower.",
+    "I put the art in fart.",
+    "Any product that needs a manual to work is broken."
+  ],
+  doge: [
+    "Dogecoin is the people's crypto.",
+    "I'm not advising anyone to buy crypto or bet the farm on dogecoin.",
+    "Due to inflation 420 has gone up by 69."
+  ],
+  starship: [
+    "Born on Earth and die on Mars. Just hopefully not at impact.",
+    "If humanity doesn't land on Mars in my lifetime, I would be very disappointed.",
+    "We are the first species capable of self-annihilation."
+  ]
+};
+
 const enemyKinds = {
   scout: {
     name: "Cinder Scout",
@@ -303,19 +331,20 @@ function nearestPlayer(enemy, players) {
 function createEnemy(type, stage, x, y) {
   if (type === "boss") {
     const isBroadcaster = stage.number === 5;
+    const isElon = stage.number === 10;
     return {
       type: "boss",
-      bossKind: isBroadcaster ? "broadcaster" : "gatebreaker",
-      name: isBroadcaster ? "Charlie Kirk, Campus Broadcaster" : `Gatebreaker ${Math.ceil(stage.number / 5)}`,
+      bossKind: isBroadcaster ? "broadcaster" : isElon ? "elon" : "gatebreaker",
+      name: isBroadcaster ? "Charlie Kirk, Campus Broadcaster" : isElon ? "Elon Musk, Market Volatility" : `Gatebreaker ${Math.ceil(stage.number / 5)}`,
       x,
       y,
       spawnX: x,
       spawnY: y,
-      radius: isBroadcaster ? 42 : 52,
-      hp: (isBroadcaster ? 560 : 470) * stage.enemyHpMultiplier,
-      maxHp: (isBroadcaster ? 560 : 470) * stage.enemyHpMultiplier,
-      speed: isBroadcaster ? 78 : 88,
-      damage: (isBroadcaster ? 19 : 23) * stage.enemyDamageMultiplier,
+      radius: isBroadcaster ? 42 : isElon ? 44 : 52,
+      hp: (isBroadcaster ? 560 : isElon ? 680 : 470) * stage.enemyHpMultiplier,
+      maxHp: (isBroadcaster ? 560 : isElon ? 680 : 470) * stage.enemyHpMultiplier,
+      speed: isBroadcaster ? 78 : isElon ? 92 : 88,
+      damage: (isBroadcaster ? 19 : isElon ? 22 : 23) * stage.enemyDamageMultiplier,
       sightRange: Infinity,
       loseRange: Infinity,
       leashRange: Infinity,
@@ -331,11 +360,20 @@ function createEnemy(type, stage, x, y) {
       phase: 0,
       shieldTimer: 0,
       supporterTimer: isBroadcaster ? 4.5 : Infinity,
+      marketState: isElon ? "neutral" : null,
+      marketTimer: 0,
+      marketDamageBoost: false,
+      marketDefenseTimer: 0,
+      elonDoge: null,
+      elonCoins: [],
+      elonHazards: [],
+      elonSpeedBuff: 0,
+      podTimer: 0,
       timeSinceHit: 0,
       regenerating: false,
       spriteAction: "idle",
-      color: isBroadcaster ? "#263a74" : "#a747d9",
-      habit: isBroadcaster ? "uses media-themed attacks and summons supporters" : "tracks the whole room and alternates bullet patterns"
+      color: isBroadcaster ? "#263a74" : isElon ? "#182748" : "#a747d9",
+      habit: isBroadcaster ? "uses media-themed attacks and summons supporters" : isElon ? "fires X posts, clears lanes with cars, burns cones, drops Doge, and launches rockets" : "tracks the whole room and alternates bullet patterns"
     };
   }
 
@@ -372,6 +410,10 @@ function tickEnemyTimers(enemy, dt) {
   enemy.slowed = Math.max(0, (enemy.slowed ?? 0) - dt);
   enemy.shieldTimer = Math.max(0, (enemy.shieldTimer ?? 0) - dt);
   enemy.dragonShieldDown = Math.max(0, (enemy.dragonShieldDown ?? 0) - dt);
+  enemy.marketTimer = Math.max(0, (enemy.marketTimer ?? 0) - dt);
+  enemy.marketDefenseTimer = Math.max(0, (enemy.marketDefenseTimer ?? 0) - dt);
+  enemy.elonSpeedBuff = Math.max(0, (enemy.elonSpeedBuff ?? 0) - dt);
+  enemy.podTimer = Math.max(0, (enemy.podTimer ?? 0) - dt);
   enemy.supporterTimer = Math.max(0, (enemy.supporterTimer ?? 0) - dt);
   enemy.stateTimer = Math.max(0, enemy.stateTimer - dt);
   if (enemy.wander) {
@@ -453,6 +495,12 @@ function updateEnemyBrain(enemy, player, dt, room, combat, enemies) {
   if (!enemy.alert) {
     updateWander(enemy, dt);
     return;
+  }
+
+  if (enemy.bossKind === "elon") {
+    updateElonDoge(enemy, player, dt, combat, room);
+    updateElonHazards(enemy, player, dt, combat);
+    updateElonCoins(enemy, dt, combat);
   }
 
   if (enemy.state === "windup") {
@@ -676,6 +724,10 @@ function updateBoss(enemy, player, dt, combat, enemies, room) {
     updateBroadcasterBoss(enemy, player, dt, combat, enemies, room);
     return;
   }
+  if (enemy.bossKind === "elon") {
+    updateElonBoss(enemy, player, dt, combat, room);
+    return;
+  }
 
   const dist = distance(enemy, player);
   if (dist > 220) {
@@ -733,9 +785,108 @@ function startWindup(enemy, nextAction, duration, combat, label) {
       offsetY: -enemy.radius - 72
     });
   }
+
+  if (enemy.bossKind === "elon" && elonDialogue[nextAction]) {
+    combat.speak(enemy, pickLine(elonDialogue[nextAction]), {
+      accent: nextAction === "flamethrower" || nextAction === "starship" ? "#ef7d57" : "#73a9ff",
+      duration: nextAction === "starship" ? 2.35 : 1.8,
+      offsetY: -enemy.radius - 72
+    });
+  }
 }
 
 function finishWindup(enemy, player, combat, enemies = []) {
+  if (enemy.nextAction === "xPost") {
+    const direction = player.x >= enemy.x ? 0 : Math.PI;
+    for (let i = -1; i <= 1; i += 1) {
+      combat.spawnEnemyProjectile({
+        x: enemy.x + Math.cos(direction) * 40,
+        y: enemy.y + i * 24,
+        angle: direction,
+        speed: 660,
+        damage: consumeMarketDamage(enemy, enemy.damage * 0.52),
+        radius: 13,
+        color: "#43d9ff",
+        life: 1.25,
+        kind: "xPost",
+        labelOnHit: "X-Post"
+      });
+    }
+    enemy.specialCooldown = 1.05;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "autopilot") {
+    const lanes = 6;
+    const laneHeight = 155;
+    const top = Math.max(130, player.y - laneHeight * 2.5);
+    for (let i = 0; i < lanes; i += 1) {
+      if (i % 2 !== enemy.phase % 2) {
+        continue;
+      }
+      const fromLeft = i % 4 !== 1;
+      combat.spawnEnemyProjectile({
+        x: fromLeft ? 120 : 1960,
+        y: top + laneHeight * i,
+        angle: fromLeft ? 0 : Math.PI,
+        speed: 1120,
+        damage: consumeMarketDamage(enemy, enemy.damage * 0.9),
+        radius: 28,
+        color: "#cfd8df",
+        life: 1.9,
+        kind: "tesla",
+        labelOnHit: "Traffic"
+      });
+    }
+    enemy.specialCooldown = 2.4;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "flamethrower") {
+    enemy.elonHazards.push({
+      id: `flame-${Math.random().toString(16).slice(2)}`,
+      type: "flameCone",
+      x: enemy.x,
+      y: enemy.y,
+      angle: angleTo(enemy, player),
+      radius: 285,
+      arc: 0.78,
+      timer: 1.45,
+      total: 1.45,
+      damagePerSecond: enemy.damage * 0.72
+    });
+    enemy.specialCooldown = 1.85;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "doge") {
+    spawnDoge(enemy, player);
+    enemy.specialCooldown = 2.7;
+    enemy.state = "chase";
+    return;
+  }
+
+  if (enemy.nextAction === "starship") {
+    enemy.elonHazards.push({
+      id: `rocket-${Math.random().toString(16).slice(2)}`,
+      type: "rocket",
+      x: player.x,
+      y: player.y,
+      timer: 1.9,
+      total: 1.9,
+      shockDone: false,
+      plumeTick: 0
+    });
+    enemy.podTimer = 1.35;
+    enemy.specialCooldown = 3.7;
+    enemy.state = "chase";
+    combat.screenShake = Math.max(combat.screenShake, 16);
+    return;
+  }
+
   if (enemy.nextAction === "dragonBreath") {
     const baseAngle = angleTo(enemy, player);
     for (let i = -3; i <= 3; i += 1) {
@@ -984,6 +1135,172 @@ function updateDragonBoss(enemy, player, dt, combat) {
   startWindup(enemy, action, windup, combat, label);
 }
 
+function updateElonBoss(enemy, player, dt, combat, room) {
+  const dist = distance(enemy, player);
+  if (dist > 280 && enemy.podTimer <= 0) {
+    moveToward(enemy, player, dt, speedFor(enemy));
+  }
+
+  if (enemy.specialCooldown > 0 || enemy.podTimer > 0) {
+    return;
+  }
+
+  const cycle = ["xPost", "autopilot", "flamethrower", "doge", "xPost", "starship"];
+  const action = cycle[enemy.phase % cycle.length];
+  enemy.phase += 1;
+  fluctuateMarket(enemy, combat);
+  const label = {
+    xPost: "X-Post Projectile",
+    autopilot: "Autopilot Stampede",
+    flamethrower: "Not-A-Flamethrower",
+    doge: "To The Moon",
+    starship: "Starship Launch"
+  }[action];
+  const windup = action === "starship" ? 0.95 : action === "autopilot" ? 0.72 : action === "flamethrower" ? 0.48 : 0.36;
+  startWindup(enemy, action, windup, combat, label);
+}
+
+function fluctuateMarket(enemy, combat) {
+  if (Math.random() < 0.5) {
+    enemy.marketState = "green";
+    enemy.marketDamageBoost = true;
+    enemy.marketTimer = 3.2;
+    combat.floatText(enemy.x, enemy.y - enemy.radius - 38, "Ticker green: +15% next attack", "#5ec28c");
+    return;
+  }
+  enemy.marketState = "red";
+  enemy.marketDefenseTimer = 3.2;
+  enemy.marketTimer = 3.2;
+  combat.floatText(enemy.x, enemy.y - enemy.radius - 38, "Ticker red: defense up", "#d95757");
+}
+
+function consumeMarketDamage(enemy, damage) {
+  if (!enemy.marketDamageBoost) {
+    return damage;
+  }
+  enemy.marketDamageBoost = false;
+  return damage * 1.15;
+}
+
+function spawnDoge(enemy, player) {
+  const angle = angleTo(enemy, player) + randomRange(-0.35, 0.35);
+  enemy.elonDoge = {
+    x: enemy.x,
+    y: Math.max(130, enemy.y - 220),
+    vx: Math.cos(angle) * 520,
+    vy: Math.sin(angle) * 520,
+    radius: 42,
+    timer: 5.2,
+    hitCooldown: 0
+  };
+}
+
+function updateElonDoge(enemy, player, dt, combat, room) {
+  const doge = enemy.elonDoge;
+  if (!doge) {
+    return;
+  }
+  doge.timer -= dt;
+  doge.hitCooldown = Math.max(0, doge.hitCooldown - dt);
+  doge.x += doge.vx * dt;
+  doge.y += doge.vy * dt;
+  if (doge.x < room.margin + doge.radius || doge.x > room.width - room.margin - doge.radius) {
+    doge.vx *= -1;
+    doge.x = clamp(doge.x, room.margin + doge.radius, room.width - room.margin - doge.radius);
+  }
+  if (doge.y < room.margin + doge.radius || doge.y > room.height - room.margin - doge.radius) {
+    doge.vy *= -1;
+    doge.y = clamp(doge.y, room.margin + doge.radius, room.height - room.margin - doge.radius);
+  }
+  if (doge.hitCooldown <= 0 && distance(doge, player) <= doge.radius + player.radius) {
+    const hit = player.takeDamage(enemy.damage * 0.7);
+    doge.hitCooldown = 0.55;
+    scatterElonCoins(enemy, doge.x, doge.y);
+    if (hit) {
+      combat.floatText(player.x, player.y - 46, "Doge!", "#f2b85b");
+      combat.screenShake = Math.max(combat.screenShake, 8);
+    }
+  }
+  if (doge.timer <= 0) {
+    enemy.elonDoge = null;
+  }
+}
+
+function scatterElonCoins(enemy, x, y) {
+  for (let i = 0; i < 7; i += 1) {
+    const angle = (Math.PI * 2 * i) / 7 + randomRange(-0.18, 0.18);
+    enemy.elonCoins.push({
+      x: x + Math.cos(angle) * randomRange(28, 88),
+      y: y + Math.sin(angle) * randomRange(28, 88),
+      radius: 14,
+      timer: 5.8,
+      bob: Math.random() * Math.PI * 2
+    });
+  }
+}
+
+function updateElonCoins(enemy, dt, combat) {
+  for (const coin of enemy.elonCoins) {
+    coin.timer -= dt;
+    coin.bob += dt * 5;
+    if (distance(enemy, coin) <= enemy.radius + coin.radius + 16) {
+      coin.timer = 0;
+      enemy.elonSpeedBuff = Math.max(enemy.elonSpeedBuff ?? 0, 2.4);
+      combat.floatText(enemy.x, enemy.y - enemy.radius - 32, "Coin rush", "#f2b85b");
+    }
+  }
+  enemy.elonCoins = enemy.elonCoins.filter((coin) => coin.timer > 0);
+}
+
+function updateElonHazards(enemy, player, dt, combat) {
+  for (const hazard of enemy.elonHazards) {
+    hazard.timer -= dt;
+    if (hazard.type === "flameCone") {
+      if (pointInCone(hazard, player)) {
+        const hit = player.takeDamage(hazard.damagePerSecond * dt);
+        if (hit && Math.random() < 0.08) {
+          combat.floatText(player.x, player.y - 46, "Burn", "#ef7d57");
+        }
+      }
+      continue;
+    }
+    if (hazard.type === "rocket") {
+      const elapsed = hazard.total - hazard.timer;
+      if (!hazard.shockDone && elapsed >= 0.6) {
+        hazard.shockDone = true;
+        if (distance(hazard, player) <= 720 + player.radius) {
+          const hit = player.takeDamage(enemy.damage * 1.05);
+          if (hit) {
+            combat.floatText(player.x, player.y - 46, "Shockwave", "#f2b85b");
+          }
+        }
+        combat.screenShake = Math.max(combat.screenShake, 24);
+      }
+      hazard.plumeTick -= dt;
+      if (elapsed >= 0.85 && hazard.plumeTick <= 0) {
+        hazard.plumeTick = 0.18;
+        if (distance(hazard, player) <= 210 + player.radius) {
+          const hit = player.takeDamage(enemy.damage * 0.34);
+          if (hit) {
+            combat.floatText(player.x, player.y - 46, "Rocket fire", "#ef7d57");
+          }
+        }
+      }
+    }
+  }
+  enemy.elonHazards = enemy.elonHazards.filter((hazard) => hazard.timer > 0);
+}
+
+function pointInCone(cone, target) {
+  const dist = distance(cone, target);
+  if (dist > cone.radius + target.radius) {
+    return false;
+  }
+  const toTarget = angleTo(cone, target);
+  const delta = Math.atan2(Math.sin(toTarget - cone.angle), Math.cos(toTarget - cone.angle));
+  return Math.abs(delta) <= cone.arc / 2;
+}
+
 function updateCharge(enemy, dt) {
   enemy.x += enemy.charge.x * speedFor(enemy) * enemy.chargeSpeed * dt;
   enemy.y += enemy.charge.y * speedFor(enemy) * enemy.chargeSpeed * dt;
@@ -1061,7 +1378,7 @@ function shootAtPlayer(enemy, player, combat, speed, damage, color) {
 }
 
 function speedFor(enemy) {
-  return enemy.speed * (enemy.slowed > 0 ? 0.55 : 1);
+  return enemy.speed * (enemy.slowed > 0 ? 0.55 : 1) * (enemy.elonSpeedBuff > 0 ? 1.45 : 1);
 }
 
 function moveToward(enemy, target, dt, speed) {

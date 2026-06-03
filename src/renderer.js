@@ -51,6 +51,9 @@ export class Renderer {
     this.drawProjectiles(ctx, game.combat.enemyProjectiles);
     this.drawSlashes(ctx, game.combat.slashes);
     for (const enemy of game.enemies) {
+      this.drawEnemyWorldEffects(ctx, enemy);
+    }
+    for (const enemy of game.enemies) {
       this.drawEnemy(ctx, enemy);
     }
     for (const player of game.players) {
@@ -311,6 +314,116 @@ export class Renderer {
     ctx.stroke();
   }
 
+  drawEnemyWorldEffects(ctx, enemy) {
+    if (enemy.bossKind !== "elon") {
+      return;
+    }
+
+    for (const hazard of enemy.elonHazards ?? []) {
+      if (hazard.type === "flameCone") {
+        const alpha = Math.max(0.16, Math.min(0.48, hazard.timer / hazard.total));
+        ctx.save();
+        ctx.translate(hazard.x, hazard.y);
+        ctx.rotate(hazard.angle);
+        ctx.fillStyle = `rgba(239, 125, 87, ${alpha})`;
+        ctx.strokeStyle = "#f2b85b";
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        ctx.arc(0, 0, hazard.radius, -hazard.arc / 2, hazard.arc / 2);
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+        ctx.restore();
+        continue;
+      }
+
+      if (hazard.type === "rocket") {
+        const elapsed = hazard.total - hazard.timer;
+        ctx.save();
+        ctx.translate(hazard.x, hazard.y);
+        if (elapsed < 0.6) {
+          ctx.strokeStyle = "#f2b85b";
+          ctx.lineWidth = 5;
+          ctx.beginPath();
+          ctx.arc(0, 0, 190 + Math.sin(performance.now() / 55) * 10, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "#f2b85b";
+          ctx.font = "900 16px ui-sans-serif, system-ui";
+          ctx.textAlign = "center";
+          ctx.fillText("STARSHIP", 0, -210);
+        } else {
+          const shock = Math.min(720, (elapsed - 0.6) * 1200);
+          ctx.strokeStyle = "rgba(242, 184, 91, 0.55)";
+          ctx.lineWidth = 8;
+          ctx.beginPath();
+          ctx.arc(0, 0, shock, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(239, 125, 87, 0.42)";
+          ctx.beginPath();
+          ctx.arc(0, 0, 210, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.fillStyle = "#cfd8df";
+          ctx.fillRect(-18, -190, 36, 170);
+          ctx.fillStyle = "#ef7d57";
+          ctx.beginPath();
+          ctx.moveTo(-44, -12);
+          ctx.lineTo(0, 160 + Math.sin(performance.now() / 40) * 20);
+          ctx.lineTo(44, -12);
+          ctx.closePath();
+          ctx.fill();
+        }
+        ctx.textAlign = "start";
+        ctx.restore();
+      }
+    }
+
+    for (const coin of enemy.elonCoins ?? []) {
+      const bob = Math.sin(coin.bob) * 4;
+      ctx.fillStyle = "rgba(0, 0, 0, 0.36)";
+      ctx.beginPath();
+      this.drawEllipse(ctx, coin.x, coin.y + 12, 16, 5);
+      ctx.fill();
+      ctx.fillStyle = "#f2b85b";
+      ctx.strokeStyle = "#101317";
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(coin.x, coin.y + bob, coin.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    const doge = enemy.elonDoge;
+    if (doge) {
+      ctx.save();
+      ctx.translate(doge.x, doge.y);
+      ctx.rotate(performance.now() / 210);
+      ctx.fillStyle = "#d7a052";
+      ctx.strokeStyle = "#101317";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.arc(0, 0, doge.radius, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      ctx.fillStyle = "#101317";
+      ctx.beginPath();
+      ctx.arc(-14, -6, 5, 0, Math.PI * 2);
+      ctx.arc(14, -6, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = "#101317";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(-10, 12);
+      ctx.quadraticCurveTo(0, 20, 12, 12);
+      ctx.stroke();
+      ctx.fillStyle = "#f2b85b";
+      ctx.font = "900 14px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("DOGE", 0, -48);
+      ctx.restore();
+    }
+  }
+
   drawEnemy(ctx, enemy) {
     const usedSprite = this.drawEnemySprite(ctx, enemy);
     if (usedSprite) {
@@ -326,6 +439,18 @@ export class Renderer {
     ctx.beginPath();
     ctx.arc(0, 0, enemy.radius, 0, Math.PI * 2);
     ctx.fill();
+
+    if (enemy.bossKind === "elon") {
+      ctx.fillStyle = "#f6f1e8";
+      ctx.beginPath();
+      ctx.arc(enemy.radius * 0.38, 0, enemy.radius * 0.16, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = "#43d9ff";
+      ctx.font = "900 16px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText("X", -enemy.radius * 0.18, 5);
+      ctx.textAlign = "start";
+    }
 
     ctx.fillStyle = "#101317";
     ctx.beginPath();
@@ -372,6 +497,28 @@ export class Renderer {
       ctx.textAlign = "center";
       ctx.fillText(shieldActive ? "80% SHIELD" : "STUNNED", enemy.x, enemy.y - enemy.radius - 26);
       ctx.textAlign = "start";
+    }
+
+    if (enemy.bossKind === "elon") {
+      const state = enemy.marketTimer > 0 ? enemy.marketState : "neutral";
+      const color = state === "green" ? "#5ec28c" : state === "red" ? "#d95757" : "#afa89e";
+      ctx.fillStyle = "rgba(0, 0, 0, 0.62)";
+      ctx.beginPath();
+      this.drawRoundRect(ctx, enemy.x - 42, enemy.y - enemy.radius - 36, 84, 18, 5);
+      ctx.fill();
+      ctx.fillStyle = color;
+      ctx.font = "900 12px ui-sans-serif, system-ui";
+      ctx.textAlign = "center";
+      const ticker = state === "green" ? "X +15%" : state === "red" ? "X DEF" : "X --";
+      ctx.fillText(ticker, enemy.x, enemy.y - enemy.radius - 23);
+      ctx.textAlign = "start";
+      if (enemy.podTimer > 0) {
+        ctx.strokeStyle = "#d8f2ff";
+        ctx.lineWidth = 4;
+        ctx.beginPath();
+        this.drawEllipse(ctx, enemy.x, enemy.y, enemy.radius + 18, enemy.radius + 28);
+        ctx.stroke();
+      }
     }
 
     if (enemy.state === "windup") {
@@ -436,11 +583,59 @@ export class Renderer {
         this.drawIceArrowProjectile(ctx, projectile);
         continue;
       }
+      if (projectile.kind === "xPost") {
+        this.drawXPostProjectile(ctx, projectile);
+        continue;
+      }
+      if (projectile.kind === "tesla") {
+        this.drawTeslaProjectile(ctx, projectile);
+        continue;
+      }
       ctx.fillStyle = projectile.color;
       ctx.beginPath();
       ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2);
       ctx.fill();
     }
+  }
+
+  drawXPostProjectile(ctx, projectile) {
+    ctx.save();
+    ctx.translate(projectile.x, projectile.y);
+    ctx.rotate(projectile.angle);
+    ctx.strokeStyle = "#43d9ff";
+    ctx.shadowColor = "#43d9ff";
+    ctx.shadowBlur = 12;
+    ctx.lineWidth = 6;
+    ctx.beginPath();
+    ctx.moveTo(-13, -13);
+    ctx.lineTo(13, 13);
+    ctx.moveTo(13, -13);
+    ctx.lineTo(-13, 13);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  drawTeslaProjectile(ctx, projectile) {
+    ctx.save();
+    ctx.translate(projectile.x, projectile.y);
+    ctx.rotate(projectile.angle);
+    ctx.fillStyle = "rgba(67, 217, 255, 0.18)";
+    ctx.fillRect(-80, -30, 160, 60);
+    ctx.fillStyle = "#cfd8df";
+    ctx.strokeStyle = "#101317";
+    ctx.lineWidth = 4;
+    ctx.beginPath();
+    this.drawRoundRect(ctx, -52, -20, 104, 40, 10);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#73a9ff";
+    ctx.fillRect(-24, -16, 34, 13);
+    ctx.fillStyle = "#101317";
+    ctx.beginPath();
+    ctx.arc(-30, 21, 8, 0, Math.PI * 2);
+    ctx.arc(30, 21, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
   }
 
   drawIceArrowProjectile(ctx, projectile) {
