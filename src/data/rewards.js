@@ -34,6 +34,11 @@ export const weaponUpgradeBlueprints = {
   }
 };
 
+export const heroAscensionRequirements = {
+  hero: 5,
+  gold: 750
+};
+
 export function weaponUpgradeBlueprintFor(player) {
   return weaponUpgradeBlueprints[player.character?.classId] ?? weaponUpgradeBlueprints.default;
 }
@@ -42,6 +47,11 @@ export function weaponUpgradeRequirementLine(player) {
   const blueprint = weaponUpgradeBlueprintFor(player);
   const req = blueprint.requirements;
   return `${player.materials.weapon}/${req.weapon} Ore  ${player.materials.weaponCore}/${req.weaponCore} Core  ${player.gold}/${req.gold} coins`;
+}
+
+export function heroAscensionRequirementLine(player) {
+  const req = heroAscensionRequirements;
+  return `${player.materials.hero}/${req.hero} Hero Sigils  ${player.gold}/${req.gold} coins`;
 }
 
 export function canCompleteWeaponUpgrade(player) {
@@ -78,13 +88,32 @@ function addPet(player, pet) {
 
 function createEpicPet(player) {
   const roll = Math.random();
-  const pet =
-    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } :
-    roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#6ee76d", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } :
-    roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#ffcf3f", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } :
-    roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#42d9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } :
-    roll < 0.81 ? { id: "epicTiger", name: "Epic Tiger", color: "#ff7a2f", damage: 18, cooldownMax: 1.1, bleed: { duration: 3, rate: 0.018 } } :
-    { id: "epicTortoise", name: "Epic Tortoise", color: "#2fb344", damage: 12, cooldownMax: 1.25, tauntCooldown: 0 };
+  const epicPets = [
+    { weight: 1, pet: { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } },
+    { weight: 20, pet: { id: "epicSnake", name: "Epic Snake", color: "#6ee76d", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } },
+    { weight: 20, pet: { id: "epicBird", name: "Epic Bird", color: "#ffcf3f", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } },
+    { weight: 20, pet: { id: "epicFish", name: "Epic Flopping Fish", color: "#42d9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } },
+    { weight: 20, pet: { id: "epicTiger", name: "Epic Tiger", color: "#ff7a2f", damage: 18, cooldownMax: 1.1, bleed: { duration: 3, rate: 0.018 } } },
+    { weight: 20, pet: { id: "epicTortoise", name: "Epic Tortoise", color: "#2fb344", damage: 12, cooldownMax: 1.25, tauntCooldown: 0 } }
+  ];
+  const ownedPetIds = new Set(player.pets.map((pet) => pet.id));
+  if (player.passives.has("fairyHatched")) {
+    ownedPetIds.add("mythicalFairy");
+  }
+  const available = epicPets.filter((entry) => !ownedPetIds.has(entry.pet.id));
+  if (available.length === 0) {
+    return null;
+  }
+  const total = available.reduce((sum, entry) => sum + entry.weight, 0);
+  let pick = roll * total;
+  let pet = available[available.length - 1].pet;
+  for (const entry of available) {
+    pick -= entry.weight;
+    if (pick <= 0) {
+      pet = entry.pet;
+      break;
+    }
+  }
   if (pet.id === "mythicalFairy") {
     player.passives.add("fairyHatched");
   }
@@ -110,6 +139,9 @@ function addEpicEgg(player) {
 
 export function hatchEpicEgg(player, egg) {
   const pet = createEpicPet(player);
+  if (!pet) {
+    return null;
+  }
   addPet(player, pet);
   return pet;
 }

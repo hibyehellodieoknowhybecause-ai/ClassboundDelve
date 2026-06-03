@@ -716,7 +716,11 @@ export class Player {
         if ((this.game?.stageNumber ?? 0) >= (pet.hatchStage ?? Infinity)) {
           const hatched = hatchEpicEgg(this, pet);
           this.pets = this.pets.filter((candidate) => candidate !== pet);
-          combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+          if (hatched) {
+            combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+          } else {
+            combat.floatText(this.x, this.y - 92, "All epic pets already owned", "#afa89e");
+          }
         }
         continue;
       }
@@ -851,6 +855,14 @@ export class Player {
       return;
     }
     const radius = 16;
+    pet.x = clamp(pet.x, room.margin + radius, room.width - room.margin - radius);
+    pet.y = clamp(pet.y, room.margin + radius, room.height - room.margin - radius);
+    for (const obstacle of room.obstacles ?? []) {
+      const pushed = { x: pet.x, y: pet.y, radius };
+      pushCircleOutOfRect(pushed, obstacle);
+      pet.x = pushed.x;
+      pet.y = pushed.y;
+    }
     pet.x = clamp(pet.x, room.margin + radius, room.width - room.margin - radius);
     pet.y = clamp(pet.y, room.margin + radius, room.height - room.margin - radius);
   }

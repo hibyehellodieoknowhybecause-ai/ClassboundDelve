@@ -1,4 +1,4 @@
-import { distance, randomRange } from "./utils/math.js";
+import { clamp, distance, randomRange } from "./utils/math.js";
 import { chestTiers } from "./data/rewards.js";
 
 const roomChestWeights = {
@@ -192,19 +192,32 @@ export function createPortal(x, y) {
 
 export function spawnRewardLoot(stage, player) {
   const rarity = rollChestRarity(stage);
+  const chestRadius = 34;
   const drops = [
     createRewardChest(
-      player.x + randomRange(-70, 70),
-      player.y + randomRange(-55, 55),
+      boundedLootX(stage.room, player.x + randomRange(-70, 70), chestRadius),
+      boundedLootY(stage.room, player.y + randomRange(-55, 55), chestRadius),
       stage.isBoss ? "boss reward" : "room reward",
       rarity
     )
   ];
   if (isShopStage(stage.number)) {
-    drops.push(createShop(player.x + randomRange(92, 138), player.y + randomRange(-64, 64)));
+    const shopRadius = 38;
+    drops.push(createShop(
+      boundedLootX(stage.room, player.x + randomRange(92, 138), shopRadius),
+      boundedLootY(stage.room, player.y + randomRange(-64, 64), shopRadius)
+    ));
   }
   drops.push(createPortal(stage.room.width / 2, stage.room.margin + 78));
   return drops;
+}
+
+function boundedLootX(room, x, radius) {
+  return clamp(x, room.margin + radius, room.width - room.margin - radius);
+}
+
+function boundedLootY(room, y, radius) {
+  return clamp(y, room.margin + radius, room.height - room.margin - radius);
 }
 
 export function isShopStage(stageNumber) {

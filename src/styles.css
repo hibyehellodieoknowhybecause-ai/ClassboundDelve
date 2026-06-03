@@ -530,6 +530,30 @@ input:focus {
   background: rgba(255, 255, 255, 0.045);
 }
 
+.item-row.clickable {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.item-row.clickable:hover,
+.item-row.selected {
+  border-color: rgba(242, 184, 91, 0.68);
+  background: rgba(242, 184, 91, 0.1);
+}
+
+.item-detail {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .item-name,
 .item-description,
 .item-value {

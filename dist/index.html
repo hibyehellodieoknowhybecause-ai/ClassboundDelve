@@ -543,6 +543,30 @@ input:focus {
   background: rgba(255, 255, 255, 0.045);
 }
 
+.item-row.clickable {
+  width: 100%;
+  color: inherit;
+  cursor: pointer;
+  text-align: left;
+}
+
+.item-row.clickable:hover,
+.item-row.selected {
+  border-color: rgba(242, 184, 91, 0.68);
+  background: rgba(242, 184, 91, 0.1);
+}
+
+.item-detail {
+  margin-top: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.22);
+  color: var(--muted);
+  font-size: 0.88rem;
+  font-weight: 800;
+}
+
 .item-name,
 .item-description,
 .item-value {
@@ -878,6 +902,7 @@ input:focus {
 
           <div id="itemsPanel" class="settings-section hidden">
             <div id="itemRows" class="item-list"></div>
+            <div id="itemDetail" class="item-detail">Click a blueprint to view required materials.</div>
           </div>
 
           <div id="petsPanel" class="settings-section hidden">
@@ -1363,6 +1388,11 @@ const weaponUpgradeBlueprints = {
   }
 };
 
+const heroAscensionRequirements = {
+  hero: 5,
+  gold: 750
+};
+
 function weaponUpgradeBlueprintFor(player) {
   return weaponUpgradeBlueprints[player.character?.classId] ?? weaponUpgradeBlueprints.default;
 }
@@ -1371,6 +1401,11 @@ function weaponUpgradeRequirementLine(player) {
   const blueprint = weaponUpgradeBlueprintFor(player);
   const req = blueprint.requirements;
   return `${player.materials.weapon}/${req.weapon} Ore  ${player.materials.weaponCore}/${req.weaponCore} Core  ${player.gold}/${req.gold} coins`;
+}
+
+function heroAscensionRequirementLine(player) {
+  const req = heroAscensionRequirements;
+  return `${player.materials.hero}/${req.hero} Hero Sigils  ${player.gold}/${req.gold} coins`;
 }
 
 function canCompleteWeaponUpgrade(player) {
@@ -1407,13 +1442,32 @@ function addPet(player, pet) {
 
 function createEpicPet(player) {
   const roll = Math.random();
-  const pet =
-    roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } :
-    roll < 0.21 ? { id: "epicSnake", name: "Epic Snake", color: "#6ee76d", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } :
-    roll < 0.41 ? { id: "epicBird", name: "Epic Bird", color: "#ffcf3f", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } :
-    roll < 0.61 ? { id: "epicFish", name: "Epic Flopping Fish", color: "#42d9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } :
-    roll < 0.81 ? { id: "epicTiger", name: "Epic Tiger", color: "#ff7a2f", damage: 18, cooldownMax: 1.1, bleed: { duration: 3, rate: 0.018 } } :
-    { id: "epicTortoise", name: "Epic Tortoise", color: "#2fb344", damage: 12, cooldownMax: 1.25, tauntCooldown: 0 };
+  const epicPets = [
+    { weight: 1, pet: { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } },
+    { weight: 20, pet: { id: "epicSnake", name: "Epic Snake", color: "#6ee76d", damage: 15, cooldownMax: 0.95, poison: { duration: 3, rate: 0.012 } } },
+    { weight: 20, pet: { id: "epicBird", name: "Epic Bird", color: "#ffcf3f", damage: 14, cooldownMax: 0.85, speedPulse: true, speedPulseCooldown: 0 } },
+    { weight: 20, pet: { id: "epicFish", name: "Epic Flopping Fish", color: "#42d9ff", damage: 13, cooldownMax: 1.0, slow: 1.6 } },
+    { weight: 20, pet: { id: "epicTiger", name: "Epic Tiger", color: "#ff7a2f", damage: 18, cooldownMax: 1.1, bleed: { duration: 3, rate: 0.018 } } },
+    { weight: 20, pet: { id: "epicTortoise", name: "Epic Tortoise", color: "#2fb344", damage: 12, cooldownMax: 1.25, tauntCooldown: 0 } }
+  ];
+  const ownedPetIds = new Set(player.pets.map((pet) => pet.id));
+  if (player.passives.has("fairyHatched")) {
+    ownedPetIds.add("mythicalFairy");
+  }
+  const available = epicPets.filter((entry) => !ownedPetIds.has(entry.pet.id));
+  if (available.length === 0) {
+    return null;
+  }
+  const total = available.reduce((sum, entry) => sum + entry.weight, 0);
+  let pick = roll * total;
+  let pet = available[available.length - 1].pet;
+  for (const entry of available) {
+    pick -= entry.weight;
+    if (pick <= 0) {
+      pet = entry.pet;
+      break;
+    }
+  }
   if (pet.id === "mythicalFairy") {
     player.passives.add("fairyHatched");
   }
@@ -1439,6 +1493,9 @@ function addEpicEgg(player) {
 
 function hatchEpicEgg(player, egg) {
   const pet = createEpicPet(player);
+  if (!pet) {
+    return null;
+  }
   addPet(player, pet);
   return pet;
 }
@@ -4488,19 +4545,32 @@ function createPortal(x, y) {
 
 function spawnRewardLoot(stage, player) {
   const rarity = rollChestRarity(stage);
+  const chestRadius = 34;
   const drops = [
     createRewardChest(
-      player.x + randomRange(-70, 70),
-      player.y + randomRange(-55, 55),
+      boundedLootX(stage.room, player.x + randomRange(-70, 70), chestRadius),
+      boundedLootY(stage.room, player.y + randomRange(-55, 55), chestRadius),
       stage.isBoss ? "boss reward" : "room reward",
       rarity
     )
   ];
   if (isShopStage(stage.number)) {
-    drops.push(createShop(player.x + randomRange(92, 138), player.y + randomRange(-64, 64)));
+    const shopRadius = 38;
+    drops.push(createShop(
+      boundedLootX(stage.room, player.x + randomRange(92, 138), shopRadius),
+      boundedLootY(stage.room, player.y + randomRange(-64, 64), shopRadius)
+    ));
   }
   drops.push(createPortal(stage.room.width / 2, stage.room.margin + 78));
   return drops;
+}
+
+function boundedLootX(room, x, radius) {
+  return clamp(x, room.margin + radius, room.width - room.margin - radius);
+}
+
+function boundedLootY(room, y, radius) {
+  return clamp(y, room.margin + radius, room.height - room.margin - radius);
 }
 
 function isShopStage(stageNumber) {
@@ -5255,7 +5325,11 @@ class Player {
         if ((this.game?.stageNumber ?? 0) >= (pet.hatchStage ?? Infinity)) {
           const hatched = hatchEpicEgg(this, pet);
           this.pets = this.pets.filter((candidate) => candidate !== pet);
-          combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+          if (hatched) {
+            combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+          } else {
+            combat.floatText(this.x, this.y - 92, "All epic pets already owned", "#afa89e");
+          }
         }
         continue;
       }
@@ -5390,6 +5464,14 @@ class Player {
       return;
     }
     const radius = 16;
+    pet.x = clamp(pet.x, room.margin + radius, room.width - room.margin - radius);
+    pet.y = clamp(pet.y, room.margin + radius, room.height - room.margin - radius);
+    for (const obstacle of room.obstacles ?? []) {
+      const pushed = { x: pet.x, y: pet.y, radius };
+      pushCircleOutOfRect(pushed, obstacle);
+      pet.x = pushed.x;
+      pet.y = pushed.y;
+    }
     pet.x = clamp(pet.x, room.margin + radius, room.width - room.margin - radius);
     pet.y = clamp(pet.y, room.margin + radius, room.height - room.margin - radius);
   }
@@ -7239,6 +7321,7 @@ class UI {
       upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
       upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       itemRows: document.querySelector("#itemRows"),
+      itemDetail: document.querySelector("#itemDetail"),
       petRows: document.querySelector("#petRows"),
       statRows: document.querySelector("#statRows"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
@@ -7512,6 +7595,9 @@ class UI {
   renderItems() {
     const rows = this.elements.itemRows;
     rows.innerHTML = "";
+    if (this.elements.itemDetail) {
+      this.elements.itemDetail.textContent = "Click a blueprint to view required materials.";
+    }
     const players = this.callbacks.players?.() ?? [];
     const entries = players.flatMap((player) => this.itemEntriesForPlayer(player));
 
@@ -7530,8 +7616,16 @@ class UI {
         rows.appendChild(heading);
       }
 
-      const row = document.createElement("div");
-      row.className = "item-row";
+      const row = document.createElement(entry.detail ? "button" : "div");
+      row.className = `item-row${entry.detail ? " clickable" : ""}`;
+      if (entry.detail) {
+        row.type = "button";
+        row.addEventListener("click", () => {
+          rows.querySelectorAll(".item-row.selected").forEach((candidate) => candidate.classList.remove("selected"));
+          row.classList.add("selected");
+          this.showItemDetail(entry);
+        });
+      }
       row.innerHTML = `
         <span>
           <span class="item-name">${entry.name}</span>
@@ -7557,10 +7651,23 @@ class UI {
     ];
 
     if (player.blueprints?.weaponEvolution) {
-      entries.push({ group, name: "Weapon Evolution Blueprint", value: player.weaponEvolution?.completed ? "Complete" : "Owned", description: "Allows weapon evolution crafting." });
+      const blueprint = weaponUpgradeBlueprintFor(player);
+      entries.push({
+        group,
+        name: "Weapon Evolution Blueprint",
+        value: player.weaponEvolution?.completed ? "Complete" : "Owned",
+        description: "Click to view weapon evolution materials.",
+        detail: `${blueprint.name}: ${weaponUpgradeRequirementLine(player)}. Reward: attack damage +${Math.round(blueprint.damageBonus * 100)}%.`
+      });
     }
     if (player.blueprints?.heroAscension) {
-      entries.push({ group, name: "Hero Ascension Blueprint", value: "Owned", description: "Unlocks future hero ascension crafting." });
+      entries.push({
+        group,
+        name: "Hero Ascension Blueprint",
+        value: "Owned",
+        description: "Click to view hero ascension materials.",
+        detail: `Hero Ascension: ${heroAscensionRequirementLine(player)}. Ascension crafting is tracked here for the current blueprint.`
+      });
     }
     if (player.dragonHeart) {
       entries.push({ group, name: "Dragon Heart", value: "Owned", description: "Kingdom quest reward. Powers Fire Breath and the huge max HP gain." });
@@ -7573,6 +7680,13 @@ class UI {
     }
 
     return entries;
+  }
+
+  showItemDetail(entry) {
+    if (!this.elements.itemDetail) {
+      return;
+    }
+    this.elements.itemDetail.textContent = entry.detail ?? "No extra item details.";
   }
 
   renderPets() {

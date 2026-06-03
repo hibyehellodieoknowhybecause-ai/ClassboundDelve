@@ -1,5 +1,5 @@
 import { keybindLabels, codeToLabel, resetKeybinds, saveKeybinds } from "./settings.js";
-import { rewardColors, rewardInfoFor } from "./data/rewards.js";
+import { heroAscensionRequirementLine, rewardColors, rewardInfoFor, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
 
 const rarityOrder = ["common", "uncommon", "rare", "epic", "legendary"];
 const upgradeTypes = new Set(["Stat", "Passive", "Ability", "Pet", "Evolution"]);
@@ -36,6 +36,7 @@ export class UI {
       upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
       upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       itemRows: document.querySelector("#itemRows"),
+      itemDetail: document.querySelector("#itemDetail"),
       petRows: document.querySelector("#petRows"),
       statRows: document.querySelector("#statRows"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
@@ -309,6 +310,9 @@ export class UI {
   renderItems() {
     const rows = this.elements.itemRows;
     rows.innerHTML = "";
+    if (this.elements.itemDetail) {
+      this.elements.itemDetail.textContent = "Click a blueprint to view required materials.";
+    }
     const players = this.callbacks.players?.() ?? [];
     const entries = players.flatMap((player) => this.itemEntriesForPlayer(player));
 
@@ -327,8 +331,16 @@ export class UI {
         rows.appendChild(heading);
       }
 
-      const row = document.createElement("div");
-      row.className = "item-row";
+      const row = document.createElement(entry.detail ? "button" : "div");
+      row.className = `item-row${entry.detail ? " clickable" : ""}`;
+      if (entry.detail) {
+        row.type = "button";
+        row.addEventListener("click", () => {
+          rows.querySelectorAll(".item-row.selected").forEach((candidate) => candidate.classList.remove("selected"));
+          row.classList.add("selected");
+          this.showItemDetail(entry);
+        });
+      }
       row.innerHTML = `
         <span>
           <span class="item-name">${entry.name}</span>
@@ -354,10 +366,23 @@ export class UI {
     ];
 
     if (player.blueprints?.weaponEvolution) {
-      entries.push({ group, name: "Weapon Evolution Blueprint", value: player.weaponEvolution?.completed ? "Complete" : "Owned", description: "Allows weapon evolution crafting." });
+      const blueprint = weaponUpgradeBlueprintFor(player);
+      entries.push({
+        group,
+        name: "Weapon Evolution Blueprint",
+        value: player.weaponEvolution?.completed ? "Complete" : "Owned",
+        description: "Click to view weapon evolution materials.",
+        detail: `${blueprint.name}: ${weaponUpgradeRequirementLine(player)}. Reward: attack damage +${Math.round(blueprint.damageBonus * 100)}%.`
+      });
     }
     if (player.blueprints?.heroAscension) {
-      entries.push({ group, name: "Hero Ascension Blueprint", value: "Owned", description: "Unlocks future hero ascension crafting." });
+      entries.push({
+        group,
+        name: "Hero Ascension Blueprint",
+        value: "Owned",
+        description: "Click to view hero ascension materials.",
+        detail: `Hero Ascension: ${heroAscensionRequirementLine(player)}. Ascension crafting is tracked here for the current blueprint.`
+      });
     }
     if (player.dragonHeart) {
       entries.push({ group, name: "Dragon Heart", value: "Owned", description: "Kingdom quest reward. Powers Fire Breath and the huge max HP gain." });
@@ -370,6 +395,13 @@ export class UI {
     }
 
     return entries;
+  }
+
+  showItemDetail(entry) {
+    if (!this.elements.itemDetail) {
+      return;
+    }
+    this.elements.itemDetail.textContent = entry.detail ?? "No extra item details.";
   }
 
   renderPets() {
