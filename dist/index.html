@@ -1664,6 +1664,23 @@ const rewardPool = [
   }
 ];
 
+const legacyRewardIds = new Set([
+  "heartCoreCommon",
+  "attackDamage",
+  "attackSpeed",
+  "moveSpeed",
+  "dashTraining",
+  "ultimateBattery",
+  "potionBelt",
+  "secondHeart",
+  "arcaneWisp",
+  "ascendantCore",
+  "whirlwindRadius",
+  "whirlwindBlades",
+  "netSize",
+  "netThorns"
+]);
+
 const shopPool = [
   {
     id: "shopHealthPot",
@@ -1827,7 +1844,19 @@ const chestTiers = {
 };
 
 function rollRewardOptions(player, count = 3, chestRarity = "common") {
-  return rollOptions(player, rewardPool, count, chestTiers[chestRarity]?.rewardWeights ?? chestTiers.common.rewardWeights);
+  const weights = chestTiers[chestRarity]?.rewardWeights ?? chestTiers.common.rewardWeights;
+  const options = rollOptions(player, rewardPool, count, weights);
+  if (options.length === 0 || options.some((reward) => !legacyRewardIds.has(reward.id))) {
+    return options;
+  }
+
+  const freshPool = filteredPool(player, rewardPool)
+    .filter((reward) => !legacyRewardIds.has(reward.id) && !options.some((option) => option.id === reward.id));
+  const freshReward = rollReward(freshPool, weights);
+  if (freshReward) {
+    options[options.length - 1] = freshReward;
+  }
+  return options;
 }
 
 function rollShopOptions(player, count = 3) {
