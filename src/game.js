@@ -1,6 +1,6 @@
 import { getCharacter, mannequinCharacter } from "./data/characters.js";
 import { weapons } from "./data/weapons.js";
-import { applyReward, canApplyReward, completeWeaponUpgrade, ensureGuaranteedShopStock, rollRewardOptions, rollShopOptions, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
+import { applyReward, canApplyReward, completeWeaponUpgrade, ensureGuaranteedShopStock, findSecretDrop, grantSecretDrop, rollRewardOptions, rollShopOptions, weaponUpgradeBlueprintFor, weaponUpgradeRequirementLine } from "./data/rewards.js";
 import { createDragonQuestStage, createHiddenQuestStage, createLobbyStage, createStage } from "./data/stages.js";
 import { Player } from "./player.js";
 import { createDragonEnemy, createEnemies, updateEnemies } from "./enemies.js";
@@ -363,6 +363,13 @@ export class Game {
       return { ok: true, prompt: "coins", message: "How many coins do you want?" };
     }
 
+    if (normalized === "drop party") {
+      if (this.players.length === 0) {
+        return { ok: false, message: "Start a run before starting a drop party." };
+      }
+      return { ok: true, prompt: "drop", message: "Which drop and how many?" };
+    }
+
     return { ok: false, message: "Unknown secret code." };
   }
 
@@ -379,6 +386,30 @@ export class Game {
       this.combat.floatText(player.x, player.y - 72, `+${coins} coins`, "#f2b85b");
     }
     return { ok: true, message: `${coins} coins granted.` };
+  }
+
+  grantDrop(query, amount) {
+    if (this.players.length === 0) {
+      return { ok: false, message: "Start a run before granting drops." };
+    }
+    const drop = findSecretDrop(query);
+    if (!drop) {
+      return { ok: false, message: `Unknown drop: ${query}` };
+    }
+    const requested = Math.max(1, Math.floor(amount));
+    let totalGranted = 0;
+    for (const player of this.players) {
+      const granted = grantSecretDrop(player, drop, requested);
+      totalGranted += granted;
+      if (granted > 0) {
+        this.combat.floatText(player.x, player.y - 72, `+${granted} ${drop.name}`, "#f2b85b");
+        this.tryCompleteWeaponUpgrade(player);
+      }
+    }
+    if (totalGranted <= 0) {
+      return { ok: false, message: `${drop.name} cannot be granted right now.` };
+    }
+    return { ok: true, message: `${drop.name} granted x${totalGranted}.` };
   }
 
   updateRewardChoices() {

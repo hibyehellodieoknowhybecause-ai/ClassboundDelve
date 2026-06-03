@@ -3,23 +3,23 @@ export const weaponUpgradeBlueprints = {
     id: "swordTemperBlueprint",
     name: "Saber Temper Blueprint",
     requirements: {
-      weapon: 6,
-      weaponCore: 1,
-      gold: 450
+      weapon: 5,
+      weaponCore: 2,
+      gold: 500
     },
     damageBonus: 0.35,
-    description: "Requires 6 Weapon Ore, 1 Tempered Core, and 450 coins."
+    description: "Requires 5 Weapon Ore, 2 Tempered Cores, and 500 coins."
   },
   archer: {
     id: "bowstringBlueprint",
     name: "Moonstring Blueprint",
     requirements: {
-      weapon: 4,
+      weapon: 5,
       weaponCore: 2,
-      gold: 520
+      gold: 500
     },
     damageBonus: 0.35,
-    description: "Requires 4 Weapon Ore, 2 Tempered Cores, and 520 coins."
+    description: "Requires 5 Weapon Ore, 2 Tempered Cores, and 500 coins."
   },
   default: {
     id: "classWeaponBlueprint",
@@ -76,11 +76,7 @@ function addPet(player, pet) {
   });
 }
 
-function addEpicEgg(player) {
-  const maxEggs = player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched") ? 5 : 6;
-  if (player.rewardCount("epicEgg") >= maxEggs) {
-    return;
-  }
+function createEpicPet(player) {
   const roll = Math.random();
   const pet =
     roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } :
@@ -92,7 +88,30 @@ function addEpicEgg(player) {
   if (pet.id === "mythicalFairy") {
     player.passives.add("fairyHatched");
   }
+  return pet;
+}
+
+function addEpicEgg(player) {
+  const maxEggs = player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched") ? 5 : 6;
+  if (player.rewardCount("epicEgg") >= maxEggs) {
+    return;
+  }
+  const stageNumber = player.game?.stageNumber ?? 0;
+  addPet(player, {
+    id: "epicEgg",
+    name: "Epic Egg",
+    color: "#f6f1e8",
+    damage: 0,
+    cooldownMax: 999,
+    hatchStage: stageNumber + 5,
+    acquiredStage: stageNumber
+  });
+}
+
+export function hatchEpicEgg(player, egg) {
+  const pet = createEpicPet(player);
   addPet(player, pet);
+  return pet;
 }
 
 const rewardPool = [
@@ -814,6 +833,49 @@ export function rewardInfoFor(id) {
   };
 }
 
+export function secretDropOptions() {
+  return [...rewardPool, ...shopPool].map((reward) => ({
+    id: reward.id,
+    name: reward.name,
+    type: reward.type,
+    rarity: reward.rarity,
+    description: reward.description
+  }));
+}
+
+export function findSecretDrop(query) {
+  const normalized = normalizeDropQuery(query);
+  if (!normalized) {
+    return null;
+  }
+  const aliases = {
+    coins: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    coin: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    gold: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    ore: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    weaponore: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    weaponmaterial: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    core: { id: "temperedCore", name: "Tempered Core", type: "Material", rarity: "rare" },
+    temperedcore: { id: "temperedCore", name: "Tempered Core", type: "Material", rarity: "rare" },
+    sigil: { id: "heroSigil", name: "Hero Sigil", type: "Material", rarity: "uncommon" },
+    herosigil: { id: "heroSigil", name: "Hero Sigil", type: "Material", rarity: "uncommon" },
+    weaponblueprint: { id: "weaponBlueprint", name: "Weapon Evolution Blueprint", type: "Blueprint", rarity: "rare" },
+    weaponbp: { id: "weaponBlueprint", name: "Weapon Evolution Blueprint", type: "Blueprint", rarity: "rare" },
+    heroblueprint: { id: "heroBlueprint", name: "Hero Ascension Blueprint", type: "Blueprint", rarity: "rare" },
+    herobp: { id: "heroBlueprint", name: "Hero Ascension Blueprint", type: "Blueprint", rarity: "rare" },
+    dragonheart: { id: "dragonHeart", name: "Dragon Heart", type: "Quest", rarity: "legendary" },
+    firebreath: { id: "dragonHeart", name: "Dragon Heart", type: "Quest", rarity: "legendary" }
+  };
+  if (aliases[normalized]) {
+    return aliases[normalized];
+  }
+  return [...rewardPool, ...shopPool].find((reward) => normalizeDropQuery(reward.id) === normalized || normalizeDropQuery(reward.name) === normalized) ?? null;
+}
+
+function normalizeDropQuery(query) {
+  return String(query ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 export function rollShopOptions(player, count = 3) {
   let stock = filteredPool(player, shopPool)
     .filter((item) => Math.random() < (item.stockChance ?? 1))
@@ -947,4 +1009,60 @@ export function applyReward(player, reward) {
   }
   player.lastReward = reward;
   return true;
+}
+
+export function grantSecretDrop(player, drop, amount) {
+  const count = Math.max(1, Math.floor(amount));
+  if (drop.id === "coins") {
+    player.gold += count;
+    return count;
+  }
+  if (drop.id === "weaponOre") {
+    player.materials.weapon += count;
+    return count;
+  }
+  if (drop.id === "temperedCore") {
+    player.materials.weaponCore += count;
+    return count;
+  }
+  if (drop.id === "heroSigil") {
+    player.materials.hero += count;
+    return count;
+  }
+  if (drop.id === "weaponBlueprint") {
+    player.blueprints.weaponEvolution = true;
+    return 1;
+  }
+  if (drop.id === "heroBlueprint") {
+    player.blueprints.heroAscension = true;
+    return 1;
+  }
+  if (drop.id === "dragonHeart") {
+    if (!player.dragonHeart) {
+      player.dragonHeart = true;
+      player.dragonFireBreath = true;
+      player.extraAbilityId = "fireBreath";
+      const hpGain = Math.ceil(player.maxHp * 2);
+      player.maxHp += hpGain;
+      player.hp += hpGain;
+    }
+    return 1;
+  }
+
+  let granted = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (!canApplyReward(player, drop) && granted > 0) {
+      break;
+    }
+    if (!canApplyReward(player, drop)) {
+      return granted;
+    }
+    if (drop.apply) {
+      drop.apply(player);
+    }
+    player.rewardHistory.push(drop.id);
+    player.lastReward = drop;
+    granted += 1;
+  }
+  return granted;
 }

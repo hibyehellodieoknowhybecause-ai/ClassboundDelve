@@ -1,5 +1,6 @@
 import { abilities } from "./data/abilities.js";
 import { characters } from "./data/characters.js";
+import { hatchEpicEgg } from "./data/rewards.js";
 import { weapons } from "./data/weapons.js";
 import { angleTo, clamp, distance, normalize, pushCircleOutOfRect } from "./utils/math.js";
 
@@ -12,6 +13,7 @@ const P1_CONTROLS = {
   autoAimAttack: "autoAimAttack",
   ability: "ability",
   extraAbility: "extraAbility",
+  fireBreath: "fireBreath",
   interact: "interact"
 };
 
@@ -24,6 +26,7 @@ const P2_CONTROLS = {
   autoAimAttack: "p2AutoAimAttack",
   ability: "p2Ability",
   extraAbility: "p2ExtraAbility",
+  fireBreath: "p2FireBreath",
   interact: "p2Interact"
 };
 
@@ -326,6 +329,10 @@ export class Player {
       this.updateMannequinTransform(dt, input, combat);
     }
 
+    if (!this.game?.stage?.isLobby && this.dragonFireBreath && input.wasPressed(this.controls.fireBreath)) {
+      this.tryUseExtraAbility(combat, "fireBreath");
+    }
+
     if (!this.game?.stage?.isLobby && !this.canMannequinTransform && input.wasPressed(this.controls.extraAbility)) {
       this.tryUseExtraAbility(combat);
     }
@@ -400,8 +407,9 @@ export class Player {
     combat.floatText(this.x, this.y - 64, `${character.role} form`, character.accent);
   }
 
-  tryUseExtraAbility(combat) {
-    if (!this.extraAbilityId) {
+  tryUseExtraAbility(combat, requestedAbilityId = this.extraAbilityId) {
+    const abilityId = requestedAbilityId === "fireBreath" && this.dragonFireBreath ? "fireBreath" : requestedAbilityId;
+    if (!abilityId) {
       combat.floatText(this.x, this.y - 42, "Evolution ability locked", "#afa89e");
       return;
     }
@@ -410,7 +418,7 @@ export class Player {
       return;
     }
 
-    if (this.extraAbilityId === "guardBreaker") {
+    if (abilityId === "guardBreaker") {
       this.facing = Math.atan2(this.lastMove.y, this.lastMove.x);
       const start = { x: this.x, y: this.y };
       const dashDistance = 330;
@@ -442,7 +450,7 @@ export class Player {
       return;
     }
 
-    if (this.extraAbilityId === "arrowStorm") {
+    if (abilityId === "arrowStorm") {
       const target = this.nearestEnemy();
       if (!target) {
         combat.floatText(this.x, this.y - 42, "No target", "#afa89e");
@@ -483,7 +491,7 @@ export class Player {
       return;
     }
 
-    if (this.extraAbilityId === "fireBreath") {
+    if (abilityId === "fireBreath") {
       const target = this.nearestEnemy();
       const baseAngle = target ? angleTo(this, target) : Math.atan2(this.lastMove.y, this.lastMove.x);
       this.facing = baseAngle;
@@ -704,6 +712,14 @@ export class Player {
     for (let i = 0; i < this.pets.length; i += 1) {
       const pet = this.pets[i];
       this.updatePetMovement(pet, i, dt);
+      if (pet.id === "epicEgg") {
+        if ((this.game?.stageNumber ?? 0) >= (pet.hatchStage ?? Infinity)) {
+          const hatched = hatchEpicEgg(this, pet);
+          this.pets = this.pets.filter((candidate) => candidate !== pet);
+          combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+        }
+        continue;
+      }
       pet.cooldown = Math.max(0, pet.cooldown - dt);
       if (pet.fairyAuraCooldown !== undefined) {
         pet.fairyAuraCooldown = Math.max(0, pet.fairyAuraCooldown - dt);

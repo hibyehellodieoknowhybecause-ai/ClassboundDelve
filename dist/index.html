@@ -553,6 +553,17 @@ input:focus {
   font-weight: 900;
 }
 
+.pet-dot {
+  display: inline-block;
+  width: 0.78em;
+  height: 0.78em;
+  margin-right: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.38);
+  border-radius: 50%;
+  background: var(--pet-color, var(--gold));
+  vertical-align: -0.05em;
+}
+
 .item-description {
   margin-top: 3px;
   color: var(--muted);
@@ -569,6 +580,35 @@ input:focus {
   background: rgba(0, 0, 0, 0.22);
   text-align: center;
   font-weight: 900;
+}
+
+.stat-list {
+  display: grid;
+  gap: 8px;
+}
+
+.stat-row {
+  display: grid;
+  grid-template-columns: minmax(118px, 1.4fr) repeat(3, minmax(72px, 1fr));
+  gap: 8px;
+  align-items: center;
+  min-height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  background: rgba(255, 255, 255, 0.045);
+  color: var(--muted);
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.stat-name {
+  color: var(--ink);
+  font-weight: 900;
+}
+
+.stat-total {
+  color: var(--gold);
 }
 
 .touch-controls {
@@ -708,6 +748,10 @@ input:focus {
     min-width: 0;
   }
 
+  .stat-row {
+    grid-template-columns: 1fr;
+  }
+
   .lobby-preview {
     height: min(190px, 34vh);
   }
@@ -805,6 +849,8 @@ input:focus {
             <button id="controlsTab" class="tab-button active" type="button">Controls</button>
             <button id="upgradesTab" class="tab-button" type="button">Upgrades</button>
             <button id="itemsTab" class="tab-button" type="button">Items</button>
+            <button id="petsTab" class="tab-button" type="button">Pets</button>
+            <button id="statsTab" class="tab-button" type="button">Stats</button>
             <button id="secretCodesTab" class="tab-button" type="button">Secret Codes</button>
           </div>
 
@@ -834,6 +880,14 @@ input:focus {
             <div id="itemRows" class="item-list"></div>
           </div>
 
+          <div id="petsPanel" class="settings-section hidden">
+            <div id="petRows" class="item-list"></div>
+          </div>
+
+          <div id="statsPanel" class="settings-section hidden">
+            <div id="statRows" class="stat-list"></div>
+          </div>
+
           <div id="secretCodesPanel" class="settings-section hidden">
             <form id="secretCodeForm" class="secret-code-form">
               <label for="secretCodeInput">Secret code</label>
@@ -850,6 +904,16 @@ input:focus {
                 <input id="coinAmountInput" type="number" min="0" step="1" />
                 <button id="grantCoins" class="primary" type="submit">Grant</button>
                 <button id="cancelCoins" class="secondary" type="button">Cancel</button>
+              </div>
+            </form>
+
+            <form id="dropPrompt" class="coin-prompt hidden">
+              <label for="dropNameInput">Which drop?</label>
+              <div class="input-row">
+                <input id="dropNameInput" type="text" autocomplete="off" spellcheck="false" placeholder="Epic Egg, Weapon Ore, Fire Breath..." />
+                <input id="dropAmountInput" type="number" min="1" step="1" value="1" />
+                <button id="grantDrop" class="primary" type="submit">Grant</button>
+                <button id="cancelDrop" class="secondary" type="button">Cancel</button>
               </div>
             </form>
           </div>
@@ -1268,23 +1332,23 @@ const weaponUpgradeBlueprints = {
     id: "swordTemperBlueprint",
     name: "Saber Temper Blueprint",
     requirements: {
-      weapon: 6,
-      weaponCore: 1,
-      gold: 450
+      weapon: 5,
+      weaponCore: 2,
+      gold: 500
     },
     damageBonus: 0.35,
-    description: "Requires 6 Weapon Ore, 1 Tempered Core, and 450 coins."
+    description: "Requires 5 Weapon Ore, 2 Tempered Cores, and 500 coins."
   },
   archer: {
     id: "bowstringBlueprint",
     name: "Moonstring Blueprint",
     requirements: {
-      weapon: 4,
+      weapon: 5,
       weaponCore: 2,
-      gold: 520
+      gold: 500
     },
     damageBonus: 0.35,
-    description: "Requires 4 Weapon Ore, 2 Tempered Cores, and 520 coins."
+    description: "Requires 5 Weapon Ore, 2 Tempered Cores, and 500 coins."
   },
   default: {
     id: "classWeaponBlueprint",
@@ -1341,11 +1405,7 @@ function addPet(player, pet) {
   });
 }
 
-function addEpicEgg(player) {
-  const maxEggs = player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched") ? 5 : 6;
-  if (player.rewardCount("epicEgg") >= maxEggs) {
-    return;
-  }
+function createEpicPet(player) {
   const roll = Math.random();
   const pet =
     roll < 0.01 ? { id: "mythicalFairy", name: "Mythical Fairy", color: "#f8f4ff", damage: 24, cooldownMax: 0.75, fairyAuraCooldown: 0 } :
@@ -1357,7 +1417,30 @@ function addEpicEgg(player) {
   if (pet.id === "mythicalFairy") {
     player.passives.add("fairyHatched");
   }
+  return pet;
+}
+
+function addEpicEgg(player) {
+  const maxEggs = player.rewardCount("epicEgg") >= 5 && !player.passives.has("fairyHatched") ? 5 : 6;
+  if (player.rewardCount("epicEgg") >= maxEggs) {
+    return;
+  }
+  const stageNumber = player.game?.stageNumber ?? 0;
+  addPet(player, {
+    id: "epicEgg",
+    name: "Epic Egg",
+    color: "#f6f1e8",
+    damage: 0,
+    cooldownMax: 999,
+    hatchStage: stageNumber + 5,
+    acquiredStage: stageNumber
+  });
+}
+
+function hatchEpicEgg(player, egg) {
+  const pet = createEpicPet(player);
   addPet(player, pet);
+  return pet;
 }
 
 const rewardPool = [
@@ -2079,6 +2162,49 @@ function rewardInfoFor(id) {
   };
 }
 
+function secretDropOptions() {
+  return [...rewardPool, ...shopPool].map((reward) => ({
+    id: reward.id,
+    name: reward.name,
+    type: reward.type,
+    rarity: reward.rarity,
+    description: reward.description
+  }));
+}
+
+function findSecretDrop(query) {
+  const normalized = normalizeDropQuery(query);
+  if (!normalized) {
+    return null;
+  }
+  const aliases = {
+    coins: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    coin: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    gold: { id: "coins", name: "Coins", type: "Currency", rarity: "common" },
+    ore: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    weaponore: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    weaponmaterial: { id: "weaponOre", name: "Weapon Ore", type: "Material", rarity: "uncommon" },
+    core: { id: "temperedCore", name: "Tempered Core", type: "Material", rarity: "rare" },
+    temperedcore: { id: "temperedCore", name: "Tempered Core", type: "Material", rarity: "rare" },
+    sigil: { id: "heroSigil", name: "Hero Sigil", type: "Material", rarity: "uncommon" },
+    herosigil: { id: "heroSigil", name: "Hero Sigil", type: "Material", rarity: "uncommon" },
+    weaponblueprint: { id: "weaponBlueprint", name: "Weapon Evolution Blueprint", type: "Blueprint", rarity: "rare" },
+    weaponbp: { id: "weaponBlueprint", name: "Weapon Evolution Blueprint", type: "Blueprint", rarity: "rare" },
+    heroblueprint: { id: "heroBlueprint", name: "Hero Ascension Blueprint", type: "Blueprint", rarity: "rare" },
+    herobp: { id: "heroBlueprint", name: "Hero Ascension Blueprint", type: "Blueprint", rarity: "rare" },
+    dragonheart: { id: "dragonHeart", name: "Dragon Heart", type: "Quest", rarity: "legendary" },
+    firebreath: { id: "dragonHeart", name: "Dragon Heart", type: "Quest", rarity: "legendary" }
+  };
+  if (aliases[normalized]) {
+    return aliases[normalized];
+  }
+  return [...rewardPool, ...shopPool].find((reward) => normalizeDropQuery(reward.id) === normalized || normalizeDropQuery(reward.name) === normalized) ?? null;
+}
+
+function normalizeDropQuery(query) {
+  return String(query ?? "").toLowerCase().replace(/[^a-z0-9]/g, "");
+}
+
 function rollShopOptions(player, count = 3) {
   let stock = filteredPool(player, shopPool)
     .filter((item) => Math.random() < (item.stockChance ?? 1))
@@ -2212,6 +2338,62 @@ function applyReward(player, reward) {
   }
   player.lastReward = reward;
   return true;
+}
+
+function grantSecretDrop(player, drop, amount) {
+  const count = Math.max(1, Math.floor(amount));
+  if (drop.id === "coins") {
+    player.gold += count;
+    return count;
+  }
+  if (drop.id === "weaponOre") {
+    player.materials.weapon += count;
+    return count;
+  }
+  if (drop.id === "temperedCore") {
+    player.materials.weaponCore += count;
+    return count;
+  }
+  if (drop.id === "heroSigil") {
+    player.materials.hero += count;
+    return count;
+  }
+  if (drop.id === "weaponBlueprint") {
+    player.blueprints.weaponEvolution = true;
+    return 1;
+  }
+  if (drop.id === "heroBlueprint") {
+    player.blueprints.heroAscension = true;
+    return 1;
+  }
+  if (drop.id === "dragonHeart") {
+    if (!player.dragonHeart) {
+      player.dragonHeart = true;
+      player.dragonFireBreath = true;
+      player.extraAbilityId = "fireBreath";
+      const hpGain = Math.ceil(player.maxHp * 2);
+      player.maxHp += hpGain;
+      player.hp += hpGain;
+    }
+    return 1;
+  }
+
+  let granted = 0;
+  for (let i = 0; i < count; i += 1) {
+    if (!canApplyReward(player, drop) && granted > 0) {
+      break;
+    }
+    if (!canApplyReward(player, drop)) {
+      return granted;
+    }
+    if (drop.apply) {
+      drop.apply(player);
+    }
+    player.rewardHistory.push(drop.id);
+    player.lastReward = drop;
+    granted += 1;
+  }
+  return granted;
 }
 
 
@@ -2559,6 +2741,7 @@ const defaultKeybinds = {
   autoAimAttack: "KeyR",
   ability: "KeyQ",
   extraAbility: "KeyE",
+  fireBreath: "KeyG",
   interact: "KeyF",
   p2MoveUp: "ArrowUp",
   p2MoveDown: "ArrowDown",
@@ -2568,6 +2751,7 @@ const defaultKeybinds = {
   p2AutoAimAttack: "Slash",
   p2Ability: "Period",
   p2ExtraAbility: "Comma",
+  p2FireBreath: "Semicolon",
   p2Interact: "Enter",
   settings: "Escape"
 };
@@ -2581,6 +2765,7 @@ const keybindLabels = {
   autoAimAttack: "Auto Aim Attack",
   ability: "Ultimate Ability",
   extraAbility: "Evolution Ability",
+  fireBreath: "Fire Breath",
   interact: "Pick Up / Portal",
   p2MoveUp: "P2 Move Up",
   p2MoveDown: "P2 Move Down",
@@ -2590,6 +2775,7 @@ const keybindLabels = {
   p2AutoAimAttack: "P2 Auto Aim",
   p2Ability: "P2 Ultimate",
   p2ExtraAbility: "P2 Evolution Ability",
+  p2FireBreath: "P2 Fire Breath",
   p2Interact: "P2 Pick Up / Portal",
   settings: "Open Settings"
 };
@@ -2625,7 +2811,8 @@ function codeToLabel(code) {
     Enter: "Enter",
     Slash: "/",
     Period: ".",
-    Comma: ","
+    Comma: ",",
+    Semicolon: ";"
   };
 
   if (labels[code]) {
@@ -4365,6 +4552,7 @@ const P1_CONTROLS = {
   autoAimAttack: "autoAimAttack",
   ability: "ability",
   extraAbility: "extraAbility",
+  fireBreath: "fireBreath",
   interact: "interact"
 };
 
@@ -4377,6 +4565,7 @@ const P2_CONTROLS = {
   autoAimAttack: "p2AutoAimAttack",
   ability: "p2Ability",
   extraAbility: "p2ExtraAbility",
+  fireBreath: "p2FireBreath",
   interact: "p2Interact"
 };
 
@@ -4679,6 +4868,10 @@ class Player {
       this.updateMannequinTransform(dt, input, combat);
     }
 
+    if (!this.game?.stage?.isLobby && this.dragonFireBreath && input.wasPressed(this.controls.fireBreath)) {
+      this.tryUseExtraAbility(combat, "fireBreath");
+    }
+
     if (!this.game?.stage?.isLobby && !this.canMannequinTransform && input.wasPressed(this.controls.extraAbility)) {
       this.tryUseExtraAbility(combat);
     }
@@ -4753,8 +4946,9 @@ class Player {
     combat.floatText(this.x, this.y - 64, `${character.role} form`, character.accent);
   }
 
-  tryUseExtraAbility(combat) {
-    if (!this.extraAbilityId) {
+  tryUseExtraAbility(combat, requestedAbilityId = this.extraAbilityId) {
+    const abilityId = requestedAbilityId === "fireBreath" && this.dragonFireBreath ? "fireBreath" : requestedAbilityId;
+    if (!abilityId) {
       combat.floatText(this.x, this.y - 42, "Evolution ability locked", "#afa89e");
       return;
     }
@@ -4763,7 +4957,7 @@ class Player {
       return;
     }
 
-    if (this.extraAbilityId === "guardBreaker") {
+    if (abilityId === "guardBreaker") {
       this.facing = Math.atan2(this.lastMove.y, this.lastMove.x);
       const start = { x: this.x, y: this.y };
       const dashDistance = 330;
@@ -4795,7 +4989,7 @@ class Player {
       return;
     }
 
-    if (this.extraAbilityId === "arrowStorm") {
+    if (abilityId === "arrowStorm") {
       const target = this.nearestEnemy();
       if (!target) {
         combat.floatText(this.x, this.y - 42, "No target", "#afa89e");
@@ -4836,7 +5030,7 @@ class Player {
       return;
     }
 
-    if (this.extraAbilityId === "fireBreath") {
+    if (abilityId === "fireBreath") {
       const target = this.nearestEnemy();
       const baseAngle = target ? angleTo(this, target) : Math.atan2(this.lastMove.y, this.lastMove.x);
       this.facing = baseAngle;
@@ -5057,6 +5251,14 @@ class Player {
     for (let i = 0; i < this.pets.length; i += 1) {
       const pet = this.pets[i];
       this.updatePetMovement(pet, i, dt);
+      if (pet.id === "epicEgg") {
+        if ((this.game?.stageNumber ?? 0) >= (pet.hatchStage ?? Infinity)) {
+          const hatched = hatchEpicEgg(this, pet);
+          this.pets = this.pets.filter((candidate) => candidate !== pet);
+          combat.floatText(this.x, this.y - 92, `${hatched.name} hatched`, hatched.color);
+        }
+        continue;
+      }
       pet.cooldown = Math.max(0, pet.cooldown - dt);
       if (pet.fairyAuraCooldown !== undefined) {
         pet.fairyAuraCooldown = Math.max(0, pet.fairyAuraCooldown - dt);
@@ -7021,10 +7223,14 @@ class UI {
       controlsTab: document.querySelector("#controlsTab"),
       upgradesTab: document.querySelector("#upgradesTab"),
       itemsTab: document.querySelector("#itemsTab"),
+      petsTab: document.querySelector("#petsTab"),
+      statsTab: document.querySelector("#statsTab"),
       secretCodesTab: document.querySelector("#secretCodesTab"),
       controlsPanel: document.querySelector("#controlsPanel"),
       upgradesPanel: document.querySelector("#upgradesPanel"),
       itemsPanel: document.querySelector("#itemsPanel"),
+      petsPanel: document.querySelector("#petsPanel"),
+      statsPanel: document.querySelector("#statsPanel"),
       secretCodesPanel: document.querySelector("#secretCodesPanel"),
       keybindRows: document.querySelector("#keybindRows"),
       upgradeRows: document.querySelector("#upgradeRows"),
@@ -7033,6 +7239,8 @@ class UI {
       upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
       upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       itemRows: document.querySelector("#itemRows"),
+      petRows: document.querySelector("#petRows"),
+      statRows: document.querySelector("#statRows"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
       saveSettings: document.querySelector("#saveSettings"),
       secretCodeForm: document.querySelector("#secretCodeForm"),
@@ -7041,6 +7249,10 @@ class UI {
       coinPrompt: document.querySelector("#coinPrompt"),
       coinAmountInput: document.querySelector("#coinAmountInput"),
       cancelCoins: document.querySelector("#cancelCoins"),
+      dropPrompt: document.querySelector("#dropPrompt"),
+      dropNameInput: document.querySelector("#dropNameInput"),
+      dropAmountInput: document.querySelector("#dropAmountInput"),
+      cancelDrop: document.querySelector("#cancelDrop"),
       touchControls: document.querySelector("#touchControls"),
       touchStick: document.querySelector("#touchStick"),
       touchStickKnob: document.querySelector("#touchStickKnob"),
@@ -7061,6 +7273,8 @@ class UI {
     this.bindSettingsTab(this.elements.controlsTab, "controls");
     this.bindSettingsTab(this.elements.upgradesTab, "upgrades");
     this.bindSettingsTab(this.elements.itemsTab, "items");
+    this.bindSettingsTab(this.elements.petsTab, "pets");
+    this.bindSettingsTab(this.elements.statsTab, "stats");
     this.bindSettingsTab(this.elements.secretCodesTab, "secretCodes");
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
@@ -7081,6 +7295,11 @@ class UI {
       this.submitCoinAmount();
     });
     this.elements.cancelCoins.addEventListener("click", () => this.hideCoinPrompt());
+    this.elements.dropPrompt.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.submitDropAmount();
+    });
+    this.elements.cancelDrop.addEventListener("click", () => this.hideDropPrompt());
     this.bindTouchControls();
 
     window.addEventListener("keydown", (event) => {
@@ -7167,20 +7386,32 @@ class UI {
     const controlsActive = tab === "controls";
     const upgradesActive = tab === "upgrades";
     const itemsActive = tab === "items";
+    const petsActive = tab === "pets";
+    const statsActive = tab === "stats";
     const secretActive = tab === "secretCodes";
     this.elements.controlsTab.classList.toggle("active", controlsActive);
     this.elements.upgradesTab.classList.toggle("active", upgradesActive);
     this.elements.itemsTab.classList.toggle("active", itemsActive);
+    this.elements.petsTab.classList.toggle("active", petsActive);
+    this.elements.statsTab.classList.toggle("active", statsActive);
     this.elements.secretCodesTab.classList.toggle("active", secretActive);
     this.elements.controlsPanel.classList.toggle("hidden", !controlsActive);
     this.elements.upgradesPanel.classList.toggle("hidden", !upgradesActive);
     this.elements.itemsPanel.classList.toggle("hidden", !itemsActive);
+    this.elements.petsPanel.classList.toggle("hidden", !petsActive);
+    this.elements.statsPanel.classList.toggle("hidden", !statsActive);
     this.elements.secretCodesPanel.classList.toggle("hidden", !secretActive);
     if (upgradesActive) {
       this.renderUpgrades();
     }
     if (itemsActive) {
       this.renderItems();
+    }
+    if (petsActive) {
+      this.renderPets();
+    }
+    if (statsActive) {
+      this.renderStats();
     }
   }
 
@@ -7344,6 +7575,167 @@ class UI {
     return entries;
   }
 
+  renderPets() {
+    const rows = this.elements.petRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.petEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">No pets yet.</div>`;
+      return;
+    }
+
+    let currentGroup = "";
+    for (const entry of entries) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.style.setProperty("--pet-color", entry.color ?? "#f6f1e8");
+      row.innerHTML = `
+        <span>
+          <span class="item-name"><span class="pet-dot"></span>${entry.name}</span>
+          <span class="item-description">${entry.description}</span>
+        </span>
+        <span class="item-value">${entry.value}</span>
+      `;
+      rows.appendChild(row);
+    }
+  }
+
+  petEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+    const group = player.label ?? "Player";
+    return (player.pets ?? []).map((pet) => {
+      if (pet.id === "epicEgg") {
+        const remaining = Math.max(0, (pet.hatchStage ?? 0) - (player.game?.stageNumber ?? 0));
+        return {
+          group,
+          name: pet.name ?? "Epic Egg",
+          color: pet.color,
+          value: remaining > 0 ? `${remaining} stages` : "Ready",
+          description: `Hatches 5 stages after pickup. Acquired at stage ${pet.acquiredStage ?? "?"}.`
+        };
+      }
+      return {
+        group,
+        name: pet.name ?? pet.id ?? "Pet",
+        color: pet.color,
+        value: pet.bodyguard ? "Summon" : `${Math.round((pet.damage ?? 0) * (1 + (player.statBonuses?.petDamage ?? 0)))} dmg`,
+        description: this.petDescription(pet)
+      };
+    });
+  }
+
+  petDescription(pet) {
+    if (pet.bodyguard) {
+      return "Temporary bodyguard summon that moves freely and attacks enemies.";
+    }
+    if (pet.id === "mythicalFairy") {
+      return "Powerful fairy aura: healing, invulnerability, cooldown, damage, and pet buffs.";
+    }
+    if (pet.id === "epicSnake") {
+      return "Only this pet's attacks poison enemies.";
+    }
+    if (pet.id === "epicFish") {
+      return "Only this pet's attacks slow enemies.";
+    }
+    if (pet.id === "epicTiger") {
+      return "Only this pet's attacks bleed enemies.";
+    }
+    if (pet.id === "epicBird") {
+      return "Periodically boosts pet movement speed.";
+    }
+    if (pet.id === "epicTortoise") {
+      return "Periodically taunts enemies.";
+    }
+    return pet.freeMove ? "Pet ally that moves freely." : "Pet ally that orbits the player.";
+  }
+
+  renderStats() {
+    const rows = this.elements.statRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.statEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">Start a run to see character stats.</div>`;
+      return;
+    }
+
+    let currentGroup = "";
+    for (const entry of entries) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+      const row = document.createElement("div");
+      row.className = "stat-row";
+      row.innerHTML = `
+        <span class="stat-name">${entry.name}</span>
+        <span>${entry.base}</span>
+        <span>${entry.bonus}</span>
+        <span class="stat-total">${entry.total}</span>
+      `;
+      rows.appendChild(row);
+    }
+  }
+
+  statEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+    const group = `${player.label ?? "Player"} ${player.character?.role ?? ""}`.trim();
+    const speedBonus = (player.statBonuses?.moveSpeed ?? 0) + (player.petSpeedBoost > 0 ? 0.2 : 0) + (player.fairyBuffTimer > 0 ? 0.35 : 0);
+    const attackSpeedBonus = (player.statBonuses?.attackSpeed ?? 0) + (player.fairyBuffTimer > 0 ? 0.25 : 0);
+    const damageBonus = (player.statBonuses?.attackDamage ?? 0) + (player.attackDamageBonus?.() ?? 0) + (player.fairyBuffTimer > 0 ? 0.45 : 0);
+    const cooldownBonus = (player.statBonuses?.abilityCooldown ?? 0) + (player.fairyBuffTimer > 0 ? 0.2 : 0);
+    return [
+      { group, name: "Max HP", base: this.number(player.character?.maxHp), bonus: this.signedNumber((player.maxHp ?? 0) - (player.character?.maxHp ?? 0)), total: this.number(player.maxHp) },
+      { group, name: "Current HP", base: "-", bonus: "-", total: this.number(player.hp) },
+      { group, name: "Base Damage", base: this.number(player.baseDamage), bonus: this.percent(damageBonus), total: this.number(player.attackDamage?.()) },
+      { group, name: "Weapon Cooldown", base: `${this.number(player.weapon?.cooldown)}s`, bonus: this.percent(-attackSpeedBonus), total: `${this.number(player.weaponCooldown?.())}s` },
+      { group, name: "Move Speed", base: this.number(player.character?.speed), bonus: this.percent(speedBonus), total: this.number((player.character?.speed ?? 0) * (1 + speedBonus)) },
+      { group, name: "Dash Cooldown", base: `${this.number(player.character?.dashCooldown)}s`, bonus: this.percent(-(player.statBonuses?.dashCooldown ?? 0)), total: `${this.number((player.character?.dashCooldown ?? 0) * (1 - Math.min(0.55, player.statBonuses?.dashCooldown ?? 0)))}s` },
+      { group, name: "Dash Distance", base: "100%", bonus: this.percent(player.statBonuses?.dashDistance ?? 0), total: this.percent(1 + (player.statBonuses?.dashDistance ?? 0), false) },
+      { group, name: "Damage Reduction", base: "0%", bonus: this.percent(player.statBonuses?.damageReduction ?? 0), total: this.percent(player.statBonuses?.damageReduction ?? 0, false) },
+      { group, name: "Potion Heal", base: "100%", bonus: this.percent(player.statBonuses?.potionHeal ?? 0), total: this.percent(1 + (player.statBonuses?.potionHeal ?? 0), false) },
+      { group, name: "Ability Cooldown", base: "100%", bonus: this.percent(-cooldownBonus), total: this.percent(1 - Math.min(0.65, cooldownBonus), false) },
+      { group, name: "Pet Damage", base: "100%", bonus: this.percent(player.statBonuses?.petDamage ?? 0), total: this.percent(1 + (player.statBonuses?.petDamage ?? 0), false) },
+      { group, name: "Lifesteal", base: "0%", bonus: this.percent(player.statBonuses?.lifesteal ?? 0), total: this.percent(player.statBonuses?.lifesteal ?? 0, false) }
+    ];
+  }
+
+  number(value) {
+    return Number.isFinite(value) ? `${Math.round(value * 10) / 10}` : "-";
+  }
+
+  signedNumber(value) {
+    if (!Number.isFinite(value) || value === 0) {
+      return "0";
+    }
+    return `${value > 0 ? "+" : ""}${Math.round(value * 10) / 10}`;
+  }
+
+  percent(value, signed = true) {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    const amount = Math.round(value * 1000) / 10;
+    return `${signed && amount > 0 ? "+" : ""}${amount}%`;
+  }
+
   showUpgradeDetail(entry) {
     if (!entry) {
       this.elements.upgradeDetailName.textContent = "No upgrade selected";
@@ -7371,12 +7763,16 @@ class UI {
     this.elements.secretCodeInput.value = "";
     if (result.prompt === "coins") {
       this.showCoinPrompt();
+    } else if (result.prompt === "drop") {
+      this.showDropPrompt();
     } else {
       this.hideCoinPrompt();
+      this.hideDropPrompt();
     }
   }
 
   showCoinPrompt() {
+    this.hideDropPrompt();
     this.elements.coinAmountInput.value = "";
     this.elements.coinPrompt.classList.remove("hidden");
     this.elements.coinAmountInput.focus();
@@ -7385,6 +7781,20 @@ class UI {
   hideCoinPrompt() {
     this.elements.coinPrompt.classList.add("hidden");
     this.elements.coinAmountInput.value = "";
+  }
+
+  showDropPrompt() {
+    this.hideCoinPrompt();
+    this.elements.dropNameInput.value = "";
+    this.elements.dropAmountInput.value = "1";
+    this.elements.dropPrompt.classList.remove("hidden");
+    this.elements.dropNameInput.focus();
+  }
+
+  hideDropPrompt() {
+    this.elements.dropPrompt.classList.add("hidden");
+    this.elements.dropNameInput.value = "";
+    this.elements.dropAmountInput.value = "1";
   }
 
   submitCoinAmount() {
@@ -7396,6 +7806,28 @@ class UI {
     const result = this.callbacks.grantCoins?.(amount) ?? { ok: false, message: "Coins could not be granted." };
     this.setSecretCodeMessage(result.message ?? "");
     this.hideCoinPrompt();
+  }
+
+  submitDropAmount() {
+    const query = this.elements.dropNameInput.value.trim();
+    const amount = Math.floor(Number(this.elements.dropAmountInput.value));
+    if (!query) {
+      this.setSecretCodeMessage("Type a drop name first.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      this.setSecretCodeMessage("Enter a positive drop amount.");
+      return;
+    }
+    const result = this.callbacks.grantDrop?.(query, amount) ?? { ok: false, message: "Drop could not be granted." };
+    this.setSecretCodeMessage(result.message ?? "");
+    if (result.ok) {
+      this.hideDropPrompt();
+      this.renderUpgrades();
+      this.renderItems();
+      this.renderPets();
+      this.renderStats();
+    }
   }
 
   setSecretCodeMessage(message) {
@@ -7439,6 +7871,8 @@ class UI {
     this.renderKeybinds();
     this.renderUpgrades();
     this.renderItems();
+    this.renderPets();
+    this.renderStats();
     this.showSettingsTab("controls");
     this.elements.settings.classList.remove("hidden");
   }
@@ -7446,6 +7880,7 @@ class UI {
   hideSettings() {
     this.listeningFor = null;
     this.hideCoinPrompt();
+    this.hideDropPrompt();
     this.elements.settings.classList.add("hidden");
     if (this.elements.menu.classList.contains("hidden") && this.elements.gameOver.classList.contains("hidden")) {
       this.setTouchControlsVisible(true);
@@ -7838,6 +8273,13 @@ class Game {
       return { ok: true, prompt: "coins", message: "How many coins do you want?" };
     }
 
+    if (normalized === "drop party") {
+      if (this.players.length === 0) {
+        return { ok: false, message: "Start a run before starting a drop party." };
+      }
+      return { ok: true, prompt: "drop", message: "Which drop and how many?" };
+    }
+
     return { ok: false, message: "Unknown secret code." };
   }
 
@@ -7854,6 +8296,30 @@ class Game {
       this.combat.floatText(player.x, player.y - 72, `+${coins} coins`, "#f2b85b");
     }
     return { ok: true, message: `${coins} coins granted.` };
+  }
+
+  grantDrop(query, amount) {
+    if (this.players.length === 0) {
+      return { ok: false, message: "Start a run before granting drops." };
+    }
+    const drop = findSecretDrop(query);
+    if (!drop) {
+      return { ok: false, message: `Unknown drop: ${query}` };
+    }
+    const requested = Math.max(1, Math.floor(amount));
+    let totalGranted = 0;
+    for (const player of this.players) {
+      const granted = grantSecretDrop(player, drop, requested);
+      totalGranted += granted;
+      if (granted > 0) {
+        this.combat.floatText(player.x, player.y - 72, `+${granted} ${drop.name}`, "#f2b85b");
+        this.tryCompleteWeaponUpgrade(player);
+      }
+    }
+    if (totalGranted <= 0) {
+      return { ok: false, message: `${drop.name} cannot be granted right now.` };
+    }
+    return { ok: true, message: `${drop.name} granted x${totalGranted}.` };
   }
 
   updateRewardChoices() {
@@ -8433,6 +8899,7 @@ ui.init({
   start: (characterId, playerCount) => game.start(characterId, playerCount),
   secretCode: (code) => game.handleSecretCode(code),
   grantCoins: (amount) => game.grantCoins(amount),
+  grantDrop: (query, amount) => game.grantDrop(query, amount),
   players: () => game.players
 });
 

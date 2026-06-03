@@ -63,6 +63,8 @@
             <button id="controlsTab" class="tab-button active" type="button">Controls</button>
             <button id="upgradesTab" class="tab-button" type="button">Upgrades</button>
             <button id="itemsTab" class="tab-button" type="button">Items</button>
+            <button id="petsTab" class="tab-button" type="button">Pets</button>
+            <button id="statsTab" class="tab-button" type="button">Stats</button>
             <button id="secretCodesTab" class="tab-button" type="button">Secret Codes</button>
           </div>
 
@@ -92,6 +94,14 @@
             <div id="itemRows" class="item-list"></div>
           </div>
 
+          <div id="petsPanel" class="settings-section hidden">
+            <div id="petRows" class="item-list"></div>
+          </div>
+
+          <div id="statsPanel" class="settings-section hidden">
+            <div id="statRows" class="stat-list"></div>
+          </div>
+
           <div id="secretCodesPanel" class="settings-section hidden">
             <form id="secretCodeForm" class="secret-code-form">
               <label for="secretCodeInput">Secret code</label>
@@ -108,6 +118,16 @@
                 <input id="coinAmountInput" type="number" min="0" step="1" />
                 <button id="grantCoins" class="primary" type="submit">Grant</button>
                 <button id="cancelCoins" class="secondary" type="button">Cancel</button>
+              </div>
+            </form>
+
+            <form id="dropPrompt" class="coin-prompt hidden">
+              <label for="dropNameInput">Which drop?</label>
+              <div class="input-row">
+                <input id="dropNameInput" type="text" autocomplete="off" spellcheck="false" placeholder="Epic Egg, Weapon Ore, Fire Breath..." />
+                <input id="dropAmountInput" type="number" min="1" step="1" value="1" />
+                <button id="grantDrop" class="primary" type="submit">Grant</button>
+                <button id="cancelDrop" class="secondary" type="button">Cancel</button>
               </div>
             </form>
           </div>

@@ -20,10 +20,14 @@ export class UI {
       controlsTab: document.querySelector("#controlsTab"),
       upgradesTab: document.querySelector("#upgradesTab"),
       itemsTab: document.querySelector("#itemsTab"),
+      petsTab: document.querySelector("#petsTab"),
+      statsTab: document.querySelector("#statsTab"),
       secretCodesTab: document.querySelector("#secretCodesTab"),
       controlsPanel: document.querySelector("#controlsPanel"),
       upgradesPanel: document.querySelector("#upgradesPanel"),
       itemsPanel: document.querySelector("#itemsPanel"),
+      petsPanel: document.querySelector("#petsPanel"),
+      statsPanel: document.querySelector("#statsPanel"),
       secretCodesPanel: document.querySelector("#secretCodesPanel"),
       keybindRows: document.querySelector("#keybindRows"),
       upgradeRows: document.querySelector("#upgradeRows"),
@@ -32,6 +36,8 @@ export class UI {
       upgradeDetailMeta: document.querySelector("#upgradeDetailMeta"),
       upgradeDetailDescription: document.querySelector("#upgradeDetailDescription"),
       itemRows: document.querySelector("#itemRows"),
+      petRows: document.querySelector("#petRows"),
+      statRows: document.querySelector("#statRows"),
       resetKeybinds: document.querySelector("#resetKeybinds"),
       saveSettings: document.querySelector("#saveSettings"),
       secretCodeForm: document.querySelector("#secretCodeForm"),
@@ -40,6 +46,10 @@ export class UI {
       coinPrompt: document.querySelector("#coinPrompt"),
       coinAmountInput: document.querySelector("#coinAmountInput"),
       cancelCoins: document.querySelector("#cancelCoins"),
+      dropPrompt: document.querySelector("#dropPrompt"),
+      dropNameInput: document.querySelector("#dropNameInput"),
+      dropAmountInput: document.querySelector("#dropAmountInput"),
+      cancelDrop: document.querySelector("#cancelDrop"),
       touchControls: document.querySelector("#touchControls"),
       touchStick: document.querySelector("#touchStick"),
       touchStickKnob: document.querySelector("#touchStickKnob"),
@@ -60,6 +70,8 @@ export class UI {
     this.bindSettingsTab(this.elements.controlsTab, "controls");
     this.bindSettingsTab(this.elements.upgradesTab, "upgrades");
     this.bindSettingsTab(this.elements.itemsTab, "items");
+    this.bindSettingsTab(this.elements.petsTab, "pets");
+    this.bindSettingsTab(this.elements.statsTab, "stats");
     this.bindSettingsTab(this.elements.secretCodesTab, "secretCodes");
     this.elements.saveSettings.addEventListener("click", () => this.saveSettings());
     this.elements.resetKeybinds.addEventListener("click", () => {
@@ -80,6 +92,11 @@ export class UI {
       this.submitCoinAmount();
     });
     this.elements.cancelCoins.addEventListener("click", () => this.hideCoinPrompt());
+    this.elements.dropPrompt.addEventListener("submit", (event) => {
+      event.preventDefault();
+      this.submitDropAmount();
+    });
+    this.elements.cancelDrop.addEventListener("click", () => this.hideDropPrompt());
     this.bindTouchControls();
 
     window.addEventListener("keydown", (event) => {
@@ -166,20 +183,32 @@ export class UI {
     const controlsActive = tab === "controls";
     const upgradesActive = tab === "upgrades";
     const itemsActive = tab === "items";
+    const petsActive = tab === "pets";
+    const statsActive = tab === "stats";
     const secretActive = tab === "secretCodes";
     this.elements.controlsTab.classList.toggle("active", controlsActive);
     this.elements.upgradesTab.classList.toggle("active", upgradesActive);
     this.elements.itemsTab.classList.toggle("active", itemsActive);
+    this.elements.petsTab.classList.toggle("active", petsActive);
+    this.elements.statsTab.classList.toggle("active", statsActive);
     this.elements.secretCodesTab.classList.toggle("active", secretActive);
     this.elements.controlsPanel.classList.toggle("hidden", !controlsActive);
     this.elements.upgradesPanel.classList.toggle("hidden", !upgradesActive);
     this.elements.itemsPanel.classList.toggle("hidden", !itemsActive);
+    this.elements.petsPanel.classList.toggle("hidden", !petsActive);
+    this.elements.statsPanel.classList.toggle("hidden", !statsActive);
     this.elements.secretCodesPanel.classList.toggle("hidden", !secretActive);
     if (upgradesActive) {
       this.renderUpgrades();
     }
     if (itemsActive) {
       this.renderItems();
+    }
+    if (petsActive) {
+      this.renderPets();
+    }
+    if (statsActive) {
+      this.renderStats();
     }
   }
 
@@ -343,6 +372,167 @@ export class UI {
     return entries;
   }
 
+  renderPets() {
+    const rows = this.elements.petRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.petEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">No pets yet.</div>`;
+      return;
+    }
+
+    let currentGroup = "";
+    for (const entry of entries) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+      const row = document.createElement("div");
+      row.className = "item-row";
+      row.style.setProperty("--pet-color", entry.color ?? "#f6f1e8");
+      row.innerHTML = `
+        <span>
+          <span class="item-name"><span class="pet-dot"></span>${entry.name}</span>
+          <span class="item-description">${entry.description}</span>
+        </span>
+        <span class="item-value">${entry.value}</span>
+      `;
+      rows.appendChild(row);
+    }
+  }
+
+  petEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+    const group = player.label ?? "Player";
+    return (player.pets ?? []).map((pet) => {
+      if (pet.id === "epicEgg") {
+        const remaining = Math.max(0, (pet.hatchStage ?? 0) - (player.game?.stageNumber ?? 0));
+        return {
+          group,
+          name: pet.name ?? "Epic Egg",
+          color: pet.color,
+          value: remaining > 0 ? `${remaining} stages` : "Ready",
+          description: `Hatches 5 stages after pickup. Acquired at stage ${pet.acquiredStage ?? "?"}.`
+        };
+      }
+      return {
+        group,
+        name: pet.name ?? pet.id ?? "Pet",
+        color: pet.color,
+        value: pet.bodyguard ? "Summon" : `${Math.round((pet.damage ?? 0) * (1 + (player.statBonuses?.petDamage ?? 0)))} dmg`,
+        description: this.petDescription(pet)
+      };
+    });
+  }
+
+  petDescription(pet) {
+    if (pet.bodyguard) {
+      return "Temporary bodyguard summon that moves freely and attacks enemies.";
+    }
+    if (pet.id === "mythicalFairy") {
+      return "Powerful fairy aura: healing, invulnerability, cooldown, damage, and pet buffs.";
+    }
+    if (pet.id === "epicSnake") {
+      return "Only this pet's attacks poison enemies.";
+    }
+    if (pet.id === "epicFish") {
+      return "Only this pet's attacks slow enemies.";
+    }
+    if (pet.id === "epicTiger") {
+      return "Only this pet's attacks bleed enemies.";
+    }
+    if (pet.id === "epicBird") {
+      return "Periodically boosts pet movement speed.";
+    }
+    if (pet.id === "epicTortoise") {
+      return "Periodically taunts enemies.";
+    }
+    return pet.freeMove ? "Pet ally that moves freely." : "Pet ally that orbits the player.";
+  }
+
+  renderStats() {
+    const rows = this.elements.statRows;
+    rows.innerHTML = "";
+    const players = this.callbacks.players?.() ?? [];
+    const entries = players.flatMap((player) => this.statEntriesForPlayer(player));
+
+    if (entries.length === 0) {
+      rows.innerHTML = `<div class="upgrade-empty">Start a run to see character stats.</div>`;
+      return;
+    }
+
+    let currentGroup = "";
+    for (const entry of entries) {
+      if (entry.group !== currentGroup) {
+        currentGroup = entry.group;
+        const heading = document.createElement("div");
+        heading.className = "upgrade-group";
+        heading.textContent = currentGroup;
+        rows.appendChild(heading);
+      }
+      const row = document.createElement("div");
+      row.className = "stat-row";
+      row.innerHTML = `
+        <span class="stat-name">${entry.name}</span>
+        <span>${entry.base}</span>
+        <span>${entry.bonus}</span>
+        <span class="stat-total">${entry.total}</span>
+      `;
+      rows.appendChild(row);
+    }
+  }
+
+  statEntriesForPlayer(player) {
+    if (!player) {
+      return [];
+    }
+    const group = `${player.label ?? "Player"} ${player.character?.role ?? ""}`.trim();
+    const speedBonus = (player.statBonuses?.moveSpeed ?? 0) + (player.petSpeedBoost > 0 ? 0.2 : 0) + (player.fairyBuffTimer > 0 ? 0.35 : 0);
+    const attackSpeedBonus = (player.statBonuses?.attackSpeed ?? 0) + (player.fairyBuffTimer > 0 ? 0.25 : 0);
+    const damageBonus = (player.statBonuses?.attackDamage ?? 0) + (player.attackDamageBonus?.() ?? 0) + (player.fairyBuffTimer > 0 ? 0.45 : 0);
+    const cooldownBonus = (player.statBonuses?.abilityCooldown ?? 0) + (player.fairyBuffTimer > 0 ? 0.2 : 0);
+    return [
+      { group, name: "Max HP", base: this.number(player.character?.maxHp), bonus: this.signedNumber((player.maxHp ?? 0) - (player.character?.maxHp ?? 0)), total: this.number(player.maxHp) },
+      { group, name: "Current HP", base: "-", bonus: "-", total: this.number(player.hp) },
+      { group, name: "Base Damage", base: this.number(player.baseDamage), bonus: this.percent(damageBonus), total: this.number(player.attackDamage?.()) },
+      { group, name: "Weapon Cooldown", base: `${this.number(player.weapon?.cooldown)}s`, bonus: this.percent(-attackSpeedBonus), total: `${this.number(player.weaponCooldown?.())}s` },
+      { group, name: "Move Speed", base: this.number(player.character?.speed), bonus: this.percent(speedBonus), total: this.number((player.character?.speed ?? 0) * (1 + speedBonus)) },
+      { group, name: "Dash Cooldown", base: `${this.number(player.character?.dashCooldown)}s`, bonus: this.percent(-(player.statBonuses?.dashCooldown ?? 0)), total: `${this.number((player.character?.dashCooldown ?? 0) * (1 - Math.min(0.55, player.statBonuses?.dashCooldown ?? 0)))}s` },
+      { group, name: "Dash Distance", base: "100%", bonus: this.percent(player.statBonuses?.dashDistance ?? 0), total: this.percent(1 + (player.statBonuses?.dashDistance ?? 0), false) },
+      { group, name: "Damage Reduction", base: "0%", bonus: this.percent(player.statBonuses?.damageReduction ?? 0), total: this.percent(player.statBonuses?.damageReduction ?? 0, false) },
+      { group, name: "Potion Heal", base: "100%", bonus: this.percent(player.statBonuses?.potionHeal ?? 0), total: this.percent(1 + (player.statBonuses?.potionHeal ?? 0), false) },
+      { group, name: "Ability Cooldown", base: "100%", bonus: this.percent(-cooldownBonus), total: this.percent(1 - Math.min(0.65, cooldownBonus), false) },
+      { group, name: "Pet Damage", base: "100%", bonus: this.percent(player.statBonuses?.petDamage ?? 0), total: this.percent(1 + (player.statBonuses?.petDamage ?? 0), false) },
+      { group, name: "Lifesteal", base: "0%", bonus: this.percent(player.statBonuses?.lifesteal ?? 0), total: this.percent(player.statBonuses?.lifesteal ?? 0, false) }
+    ];
+  }
+
+  number(value) {
+    return Number.isFinite(value) ? `${Math.round(value * 10) / 10}` : "-";
+  }
+
+  signedNumber(value) {
+    if (!Number.isFinite(value) || value === 0) {
+      return "0";
+    }
+    return `${value > 0 ? "+" : ""}${Math.round(value * 10) / 10}`;
+  }
+
+  percent(value, signed = true) {
+    if (!Number.isFinite(value)) {
+      return "-";
+    }
+    const amount = Math.round(value * 1000) / 10;
+    return `${signed && amount > 0 ? "+" : ""}${amount}%`;
+  }
+
   showUpgradeDetail(entry) {
     if (!entry) {
       this.elements.upgradeDetailName.textContent = "No upgrade selected";
@@ -370,12 +560,16 @@ export class UI {
     this.elements.secretCodeInput.value = "";
     if (result.prompt === "coins") {
       this.showCoinPrompt();
+    } else if (result.prompt === "drop") {
+      this.showDropPrompt();
     } else {
       this.hideCoinPrompt();
+      this.hideDropPrompt();
     }
   }
 
   showCoinPrompt() {
+    this.hideDropPrompt();
     this.elements.coinAmountInput.value = "";
     this.elements.coinPrompt.classList.remove("hidden");
     this.elements.coinAmountInput.focus();
@@ -384,6 +578,20 @@ export class UI {
   hideCoinPrompt() {
     this.elements.coinPrompt.classList.add("hidden");
     this.elements.coinAmountInput.value = "";
+  }
+
+  showDropPrompt() {
+    this.hideCoinPrompt();
+    this.elements.dropNameInput.value = "";
+    this.elements.dropAmountInput.value = "1";
+    this.elements.dropPrompt.classList.remove("hidden");
+    this.elements.dropNameInput.focus();
+  }
+
+  hideDropPrompt() {
+    this.elements.dropPrompt.classList.add("hidden");
+    this.elements.dropNameInput.value = "";
+    this.elements.dropAmountInput.value = "1";
   }
 
   submitCoinAmount() {
@@ -395,6 +603,28 @@ export class UI {
     const result = this.callbacks.grantCoins?.(amount) ?? { ok: false, message: "Coins could not be granted." };
     this.setSecretCodeMessage(result.message ?? "");
     this.hideCoinPrompt();
+  }
+
+  submitDropAmount() {
+    const query = this.elements.dropNameInput.value.trim();
+    const amount = Math.floor(Number(this.elements.dropAmountInput.value));
+    if (!query) {
+      this.setSecretCodeMessage("Type a drop name first.");
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      this.setSecretCodeMessage("Enter a positive drop amount.");
+      return;
+    }
+    const result = this.callbacks.grantDrop?.(query, amount) ?? { ok: false, message: "Drop could not be granted." };
+    this.setSecretCodeMessage(result.message ?? "");
+    if (result.ok) {
+      this.hideDropPrompt();
+      this.renderUpgrades();
+      this.renderItems();
+      this.renderPets();
+      this.renderStats();
+    }
   }
 
   setSecretCodeMessage(message) {
@@ -438,6 +668,8 @@ export class UI {
     this.renderKeybinds();
     this.renderUpgrades();
     this.renderItems();
+    this.renderPets();
+    this.renderStats();
     this.showSettingsTab("controls");
     this.elements.settings.classList.remove("hidden");
   }
@@ -445,6 +677,7 @@ export class UI {
   hideSettings() {
     this.listeningFor = null;
     this.hideCoinPrompt();
+    this.hideDropPrompt();
     this.elements.settings.classList.add("hidden");
     if (this.elements.menu.classList.contains("hidden") && this.elements.gameOver.classList.contains("hidden")) {
       this.setTouchControlsVisible(true);

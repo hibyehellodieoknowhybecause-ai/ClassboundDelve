@@ -9,6 +9,7 @@ export const defaultKeybinds = {
   autoAimAttack: "KeyR",
   ability: "KeyQ",
   extraAbility: "KeyE",
+  fireBreath: "KeyG",
   interact: "KeyF",
   p2MoveUp: "ArrowUp",
   p2MoveDown: "ArrowDown",
@@ -18,6 +19,7 @@ export const defaultKeybinds = {
   p2AutoAimAttack: "Slash",
   p2Ability: "Period",
   p2ExtraAbility: "Comma",
+  p2FireBreath: "Semicolon",
   p2Interact: "Enter",
   settings: "Escape"
 };
@@ -31,6 +33,7 @@ export const keybindLabels = {
   autoAimAttack: "Auto Aim Attack",
   ability: "Ultimate Ability",
   extraAbility: "Evolution Ability",
+  fireBreath: "Fire Breath",
   interact: "Pick Up / Portal",
   p2MoveUp: "P2 Move Up",
   p2MoveDown: "P2 Move Down",
@@ -40,6 +43,7 @@ export const keybindLabels = {
   p2AutoAimAttack: "P2 Auto Aim",
   p2Ability: "P2 Ultimate",
   p2ExtraAbility: "P2 Evolution Ability",
+  p2FireBreath: "P2 Fire Breath",
   p2Interact: "P2 Pick Up / Portal",
   settings: "Open Settings"
 };
@@ -75,7 +79,8 @@ export function codeToLabel(code) {
     Enter: "Enter",
     Slash: "/",
     Period: ".",
-    Comma: ","
+    Comma: ",",
+    Semicolon: ";"
   };
 
   if (labels[code]) {

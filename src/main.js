@@ -13,6 +13,7 @@ ui.init({
   start: (characterId, playerCount) => game.start(characterId, playerCount),
   secretCode: (code) => game.handleSecretCode(code),
   grantCoins: (amount) => game.grantCoins(amount),
+  grantDrop: (query, amount) => game.grantDrop(query, amount),
   players: () => game.players
 });
 
